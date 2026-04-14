@@ -1,0 +1,1 @@
+import dotenv from "dotenv";dotenv.config();export const env={port:Number(process.env.SCREENING_SERVICE_PORT||8084),mongodbUri:process.env.SCREENING_MONGODB_URI||"",redisUrl:process.env.REDIS_URL||"redis://redis:6379"};

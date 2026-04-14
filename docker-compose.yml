@@ -1,0 +1,118 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: umurava-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    ports:
+      - "${MONGO_PORT}:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: umurava-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT}:6379"
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    env_file: .env
+    environment:
+      AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT}
+      AUTH_MONGODB_URI: ${AUTH_MONGODB_URI}
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - mongo
+
+  job-service:
+    build:
+      context: .
+      dockerfile: apps/job-service/Dockerfile
+    env_file: .env
+    environment:
+      JOB_SERVICE_PORT: ${JOB_SERVICE_PORT}
+      JOB_MONGODB_URI: ${JOB_MONGODB_URI}
+    depends_on:
+      - mongo
+
+  applicant-service:
+    build:
+      context: .
+      dockerfile: apps/applicant-service/Dockerfile
+    env_file: .env
+    environment:
+      APPLICANT_SERVICE_PORT: ${APPLICANT_SERVICE_PORT}
+      APPLICANT_MONGODB_URI: ${APPLICANT_MONGODB_URI}
+      UPLOAD_DIR: /app/apps/applicant-service/src/uploads
+    depends_on:
+      - mongo
+
+  screening-service:
+    build:
+      context: .
+      dockerfile: apps/screening-service/Dockerfile
+    env_file: .env
+    environment:
+      SCREENING_SERVICE_PORT: ${SCREENING_SERVICE_PORT}
+      SCREENING_MONGODB_URI: ${SCREENING_MONGODB_URI}
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      - mongo
+      - redis
+
+  worker-service:
+    build:
+      context: .
+      dockerfile: apps/worker-service/Dockerfile
+    env_file: .env
+    environment:
+      SCREENING_MONGODB_URI: ${SCREENING_MONGODB_URI}
+      REDIS_URL: ${REDIS_URL}
+      JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}
+      APPLICANT_SERVICE_URL: http://applicant-service:${APPLICANT_SERVICE_PORT}
+      NOTIFICATION_SERVICE_URL: http://notification-service:${NOTIFICATION_SERVICE_PORT}
+    depends_on:
+      - mongo
+      - redis
+      - job-service
+      - applicant-service
+      - notification-service
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: apps/notification-service/Dockerfile
+    env_file: .env
+    environment:
+      NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT}
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT}:${NOTIFICATION_SERVICE_PORT}"
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    env_file: .env
+    environment:
+      API_GATEWAY_PORT: ${API_GATEWAY_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_SERVICE_URL: http://auth-service:${AUTH_SERVICE_PORT}
+      JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}
+      APPLICANT_SERVICE_URL: http://applicant-service:${APPLICANT_SERVICE_PORT}
+      SCREENING_SERVICE_URL: http://screening-service:${SCREENING_SERVICE_PORT}
+    ports:
+      - "${API_GATEWAY_PORT}:${API_GATEWAY_PORT}"
+    depends_on:
+      - auth-service
+      - job-service
+      - applicant-service
+      - screening-service
+
+volumes:
+  mongo_data:

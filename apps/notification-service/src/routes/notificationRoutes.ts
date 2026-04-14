@@ -1,0 +1,1 @@
+import { Router } from "express";import { Server } from "socket.io";import { createEventEmitter } from "../controllers/notificationController";export const buildNotificationRoutes=(io:Server)=>{const router=Router();router.post("/events",createEventEmitter(io));return router;};

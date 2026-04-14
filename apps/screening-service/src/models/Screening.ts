@@ -1,0 +1,35 @@
+import { Schema, model } from "mongoose";
+import { ScreeningStatus } from "@umurava/shared-types";
+
+interface Result {
+  applicantId: string;
+  rank: number;
+  score: number;
+  notes: string;
+}
+
+interface ScreeningDocument {
+  jobId: string;
+  createdBy: string;
+  status: ScreeningStatus;
+  results: Result[];
+}
+
+const screeningSchema = new Schema<ScreeningDocument>(
+  {
+    jobId: { type: String, required: true, index: true },
+    createdBy: { type: String, required: true, index: true },
+    status: { type: String, enum: ["pending", "processing", "completed"], default: "pending" },
+    results: [
+      {
+        applicantId: { type: String, required: true },
+        rank: { type: Number, required: true },
+        score: { type: Number, required: true },
+        notes: { type: String, required: true }
+      }
+    ]
+  },
+  { timestamps: true }
+);
+
+export const Screening = model<ScreeningDocument>("Screening", screeningSchema);
