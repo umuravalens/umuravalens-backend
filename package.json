@@ -1,0 +1,13 @@
+{
+  "name": "umurava-backend",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @umurava/shared-types && npm run build --workspace @umurava/shared-utils && npm run build --workspace @umurava/auth-service && npm run build --workspace @umurava/job-service && npm run build --workspace @umurava/applicant-service && npm run build --workspace @umurava/screening-service && npm run build --workspace @umurava/notification-service && npm run build --workspace @umurava/worker-service && npm run build --workspace @umurava/api-gateway",
+    "dev": "npm run dev --workspaces"
+  }
+}
