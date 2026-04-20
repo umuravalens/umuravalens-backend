@@ -50,8 +50,13 @@ services:
       APPLICANT_SERVICE_PORT: ${APPLICANT_SERVICE_PORT}
       APPLICANT_MONGODB_URI: ${APPLICANT_MONGODB_URI}
       UPLOAD_DIR: /app/apps/applicant-service/src/uploads
+      JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}
+    volumes:
+      # Same files on your PC as inside the container (Windows: under your repo path)
+      - ./apps/applicant-service/src/uploads:/app/apps/applicant-service/src/uploads
     depends_on:
       - mongo
+      - job-service
 
   screening-service:
     build:

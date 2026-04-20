@@ -105,14 +105,14 @@ Interactive Swagger UI is available at `http://localhost:8080/docs`.
 - `GET /jobs/:id` (Bearer token required, recruiter-owned job only)
 - `PATCH /jobs/:id` (Bearer token required)
 - `DELETE /jobs/:id` (Bearer token required)
+- `POST /jobs/:id/publish` (Bearer token required; sets job to published)
 - `GET /public/jobs/:publicId` (public job details for applicants)
 
 ### Applicants
 - `POST /applicants` (Bearer token required)
 - `GET /applicants` (Bearer token required, optional query: `jobId`)
-- `POST /applicants/upload-csv` (multipart form field: `file`, Bearer token required)
-- `POST /applicants/upload-pdf` (multipart form field: `file`, Bearer token required)
-- `POST /public/jobs/:publicId/apply` (public applicant submission)
+- `POST /public/jobs/:publicId/apply` (public application: multipart fields + optional `files`; no auth)
+- `GET /uploads/:filename` (serve uploaded file; use `documents[].fileUrl` from applicant responses; no auth)
 - `GET /applicants/:jobId` (Bearer token required)
 - `GET /applicant-items/:id` (Bearer token required)
 - `PATCH /applicant-items/:id` (Bearer token required)

@@ -8,6 +8,8 @@ FROM node:20-alpine
 WORKDIR /app
 COPY --from=builder /app /app
 ENV NODE_ENV=production
+# Persisted at runtime via docker-compose volume; ensure directory exists in image too.
+RUN mkdir -p /app/apps/applicant-service/src/uploads
 WORKDIR /app/apps/applicant-service
-EXPOSE 3000
+EXPOSE 8083
 CMD ["npm", "run", "start"]

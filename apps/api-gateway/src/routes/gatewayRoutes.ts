@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   getDashboardOverview,
   getPublicJobDetails,
+  proxyApplicantUploads,
   proxyToApplicants,
   proxyToAuth,
   proxyToJobs,
@@ -14,22 +15,30 @@ import { authenticate } from "../middlewares/auth";
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+router.use("/uploads", proxyApplicantUploads);
+
+/** No `authenticate` middleware — candidates and anonymous browsers must access these without JWT. */
 router.get("/public/jobs/:publicId", getPublicJobDetails);
-router.post("/public/jobs/:publicId/apply", submitPublicApplication);
+router.post("/public/jobs/:publicId/apply", upload.array("files", 20), submitPublicApplication);
 
 router.post("/auth/register", proxyToAuth);
 router.get("/auth/verify-email", proxyToAuth);
+router.post("/auth/resend-verification", proxyToAuth);
 router.post("/auth/login", proxyToAuth);
+router.post("/auth/google", proxyToAuth);
 router.post("/auth/refresh-token", proxyToAuth);
 router.post("/auth/forgot-password", proxyToAuth);
 router.post("/auth/reset-password", proxyToAuth);
 router.get("/auth/me", authenticate, proxyToAuth);
+router.patch("/auth/me", authenticate, proxyToAuth);
+router.patch("/auth/change-password", authenticate, proxyToAuth);
 router.post("/auth/logout", authenticate, proxyToAuth);
 router.post("/auth/logout-all", authenticate, proxyToAuth);
 
 router.get("/jobs", authenticate, proxyToJobs);
 router.get("/jobs/:id", authenticate, proxyToJobs);
 router.post("/jobs", authenticate, proxyToJobs);
+router.post("/jobs/:id/publish", authenticate, proxyToJobs);
 router.patch("/jobs/:id", authenticate, proxyToJobs);
 router.delete("/jobs/:id", authenticate, proxyToJobs);
 
@@ -39,8 +48,6 @@ router.get("/applicants/:jobId", authenticate, proxyToApplicants);
 router.get("/applicant-items/:id", authenticate, proxyToApplicants);
 router.patch("/applicant-items/:id", authenticate, proxyToApplicants);
 router.delete("/applicant-items/:id", authenticate, proxyToApplicants);
-router.post("/applicants/upload-csv", authenticate, upload.single("file"), proxyToApplicants);
-router.post("/applicants/upload-pdf", authenticate, upload.single("file"), proxyToApplicants);
 
 router.post("/screenings/run", authenticate, proxyToScreenings);
 router.get("/screenings", authenticate, proxyToScreenings);

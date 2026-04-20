@@ -11,6 +11,14 @@ const getUserId = (req: Request): string => {
   return userId;
 };
 
+const getPagination = (req: Request) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+  const skip = (page - 1) * limit;
+
+  return { page, limit, skip };
+};
+
 export const runScreening = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getUserId(req);
@@ -31,12 +39,26 @@ export const runScreening = async (req: Request, res: Response, next: NextFuncti
 export const listScreenings = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getUserId(req);
+    const { page, limit, skip } = getPagination(req);
     const query: any = { createdBy: recruiterId };
     if (req.query.jobId) query.jobId = String(req.query.jobId);
     if (req.query.status) query.status = String(req.query.status);
 
-    const screenings = await Screening.find(query).sort({ createdAt: -1 });
-    res.json(ok(screenings));
+    const [screenings, total] = await Promise.all([
+      Screening.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Screening.countDocuments(query)
+    ]);
+    res.json(
+      ok({
+        items: screenings,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      })
+    );
   } catch (error) {
     next(error);
   }
