@@ -6,6 +6,7 @@ import {
   getJobInternalById,
   getPublicJobByPublicId,
   listJobs,
+  publishJob,
   updateJob
 } from "../controllers/jobController";
 
@@ -15,6 +16,7 @@ router.get("/jobs/public/:publicId", getPublicJobByPublicId);
 router.get("/jobs/internal/:id", getJobInternalById);
 router.post("/jobs", createJob);
 router.get("/jobs", listJobs);
+router.post("/jobs/:id/publish", publishJob);
 router.get("/jobs/:id", getJobById);
 router.patch("/jobs/:id", updateJob);
 router.delete("/jobs/:id", deleteJob);

@@ -14,6 +14,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Applicant uploads (bind-mounted from Docker; keep directory via .gitkeep)
+apps/applicant-service/src/uploads/*
+!apps/applicant-service/src/uploads/.gitkeep
+
 # Runtime data
 pids/
 *.pid

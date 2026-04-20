@@ -10,6 +10,14 @@ const getUserId = (req: Request): string => {
   return userId;
 };
 
+const getPagination = (req: Request) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+  const skip = (page - 1) * limit;
+
+  return { page, limit, skip };
+};
+
 const validateRequirements = (requirements: any) => {
   if (!requirements) {
     throw new AppError("requirements are required", 400);
@@ -34,7 +42,7 @@ const validateRequirements = (requirements: any) => {
 export const createJob = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getUserId(req);
-    const { title, description, requirements, location, employmentType, status } = req.body;
+    const { title, description, department, requirements, location, employmentType, status } = req.body;
     if (!title || !description) {
       throw new AppError("title and description are required", 400);
     }
@@ -44,6 +52,7 @@ export const createJob = async (req: Request, res: Response, next: NextFunction)
     const job = await Job.create({
       title,
       description,
+      department: typeof department === "string" ? department.trim() : undefined,
       requirements: normalizedRequirements,
       location,
       employmentType,
@@ -60,12 +69,26 @@ export const createJob = async (req: Request, res: Response, next: NextFunction)
 export const listJobs = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getUserId(req);
+    const { page, limit, skip } = getPagination(req);
     const query: any = { createdBy: recruiterId };
     if (req.query.status) {
       query.status = String(req.query.status);
     }
-    const jobs = await Job.find(query).sort({ createdAt: -1 });
-    res.json(ok(jobs));
+    const [jobs, total] = await Promise.all([
+      Job.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Job.countDocuments(query)
+    ]);
+    res.json(
+      ok({
+        items: jobs,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      })
+    );
   } catch (error) {
     next(error);
   }
@@ -118,6 +141,23 @@ export const deleteJob = async (req: Request, res: Response, next: NextFunction)
   }
 };
 
+export const publishJob = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const recruiterId = getUserId(req);
+    const job = await Job.findOneAndUpdate(
+      { _id: req.params.id, createdBy: recruiterId },
+      { status: "published" },
+      { new: true, runValidators: true }
+    );
+    if (!job) {
+      throw new AppError("Job not found", 404);
+    }
+    res.json(ok({ ...job.toObject(), publicUrl: `/public/jobs/${job.publicId}` }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getPublicJobByPublicId = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = await Job.findOne({ publicId: req.params.publicId, status: "published" });
@@ -132,6 +172,7 @@ export const getPublicJobByPublicId = async (req: Request, res: Response, next: 
         publicId: job.publicId,
         title: job.title,
         description: job.description,
+        department: job.department,
         requirements: job.requirements,
         location: job.location,
         employmentType: job.employmentType,

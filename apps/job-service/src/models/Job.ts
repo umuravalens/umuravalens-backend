@@ -4,6 +4,7 @@ import crypto from "crypto";
 export interface JobDocument {
   title: string;
   description: string;
+  department?: string;
   requirements: {
     skills: string[];
     experience: number;
@@ -19,6 +20,7 @@ const jobSchema = new Schema<JobDocument>(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true, trim: true },
+    department: { type: String, trim: true },
     requirements: {
       skills: {
         type: [String],

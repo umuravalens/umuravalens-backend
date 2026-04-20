@@ -4,6 +4,7 @@ export interface UserDocument {
   name: string;
   email: string;
   passwordHash: string;
+  googleId?: string;
   emailVerified: boolean;
   emailVerificationTokenHash?: string;
   resetPasswordTokenHash?: string;
@@ -17,6 +18,7 @@ const userSchema = new Schema<UserDocument>(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true, lowercase: true },
     passwordHash: { type: String, required: true },
+    googleId: { type: String, index: true },
     emailVerified: { type: Boolean, default: false },
     emailVerificationTokenHash: { type: String },
     resetPasswordTokenHash: { type: String },

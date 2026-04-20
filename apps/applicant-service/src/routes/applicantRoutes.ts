@@ -1,21 +1,19 @@
 import { Router } from "express";
 import {
   addApplicant,
-  createPublicApplicant,
+  createPublicApplicantWithFiles,
   deleteApplicant,
   getApplicantById,
   listApplicants,
   listApplicantsByJobInternal,
   listApplicantsByJob,
-  updateApplicant,
-  uploadCsv,
-  uploadPdf
+  updateApplicant
 } from "../controllers/applicantController";
 import { upload } from "../utils/upload";
 
 const router = Router();
 
-router.post("/public/apply", createPublicApplicant);
+router.post("/public/jobs/:publicId/apply", upload.array("files", 20), createPublicApplicantWithFiles);
 router.get("/applicants/internal/:jobId", listApplicantsByJobInternal);
 router.post("/applicants", addApplicant);
 router.get("/applicants", listApplicants);
@@ -23,7 +21,4 @@ router.get("/applicants/:jobId", listApplicantsByJob);
 router.get("/applicant-items/:id", getApplicantById);
 router.patch("/applicant-items/:id", updateApplicant);
 router.delete("/applicant-items/:id", deleteApplicant);
-router.post("/applicants/upload-csv", upload.single("file"), uploadCsv);
-router.post("/applicants/upload-pdf", upload.single("file"), uploadPdf);
-
 export default router;

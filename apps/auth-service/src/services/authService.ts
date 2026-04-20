@@ -1,12 +1,15 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 import { AppError } from "@umurava/shared-utils";
 import { env } from "../config/env";
 import { User } from "../models/User";
+import { sendPasswordResetEmail, sendVerificationEmail } from "./emailService";
 
 const hashToken = (token: string): string => crypto.createHash("sha256").update(token).digest("hex");
 const randomToken = (): string => crypto.randomBytes(32).toString("hex");
+const oauthClient = new OAuth2Client();
 
 const signAccessToken = (userId: string, email: string) =>
   jwt.sign({ userId, email, type: "access" }, env.jwtSecret, { expiresIn: env.accessTokenExpiry as any });
@@ -33,13 +36,13 @@ export const register = async (name: string, email: string, password: string) =>
     emailVerified: false
   });
 
+  await sendVerificationEmail(user.email, user.name, verificationToken);
+
   return {
     id: user.id,
     name: user.name,
     email: user.email,
-    emailVerified: user.emailVerified,
-    verificationToken,
-    verificationHint: "Send verificationToken by email in production"
+    emailVerified: user.emailVerified
   };
 };
 
@@ -71,6 +74,65 @@ export const login = async (email: string, password: string) => {
 
   if (!user.emailVerified) {
     throw new AppError("Please verify your email before login", 403);
+  }
+
+  const accessToken = signAccessToken(user.id, user.email);
+  const refreshToken = signRefreshToken(user.id, user.email, user.refreshTokenVersion);
+
+  return {
+    accessToken,
+    refreshToken,
+    user: { id: user.id, name: user.name, email: user.email }
+  };
+};
+
+export const loginOrRegisterWithGoogle = async (idToken: string) => {
+  if (!env.googleClientId) {
+    throw new AppError("Google auth is not configured", 500);
+  }
+
+  let ticket;
+  try {
+    ticket = await oauthClient.verifyIdToken({
+      idToken,
+      audience: env.googleClientId
+    });
+  } catch {
+    throw new AppError("Invalid Google token", 401);
+  }
+
+  const payload = ticket.getPayload();
+  const email = String(payload?.email || "").toLowerCase();
+  const emailVerified = Boolean(payload?.email_verified);
+  const googleId = String(payload?.sub || "");
+  const name = String(payload?.name || "").trim();
+
+  if (!email || !googleId || !emailVerified) {
+    throw new AppError("Google account must have a verified email", 400);
+  }
+
+  let user = await User.findOne({ email });
+
+  if (!user) {
+    // Create a random password hash so existing local auth schema remains compatible.
+    const passwordHash = await bcrypt.hash(randomToken(), 10);
+    user = await User.create({
+      name: name || email.split("@")[0],
+      email,
+      passwordHash,
+      googleId,
+      emailVerified: true
+    });
+  } else {
+    if (user.googleId && user.googleId !== googleId) {
+      throw new AppError("This email is linked to another Google account", 409);
+    }
+    user.googleId = googleId;
+    user.emailVerified = true;
+    if (name) {
+      user.name = name;
+    }
+    await user.save();
   }
 
   const accessToken = signAccessToken(user.id, user.email);
@@ -133,12 +195,9 @@ export const forgotPassword = async (email: string) => {
   user.resetPasswordTokenHash = hashToken(resetToken);
   user.resetPasswordExpiresAt = new Date(Date.now() + env.resetTokenExpiryMinutes * 60 * 1000);
   await user.save();
+  await sendPasswordResetEmail(user.email, user.name, resetToken);
 
-  return {
-    sent: true,
-    resetToken,
-    resetHint: "Send resetToken by email in production"
-  };
+  return { sent: true };
 };
 
 export const resetPassword = async (token: string, newPassword: string) => {
@@ -174,4 +233,89 @@ export const getProfile = async (userId: string) => {
     emailVerified: user.emailVerified,
     createdAt: user.createdAt
   };
+};
+
+export const resendVerification = async (email: string) => {
+  const user = await User.findOne({ email });
+
+  // Keep the same response for unknown users to avoid account enumeration.
+  if (!user) {
+    return { sent: true };
+  }
+
+  if (user.emailVerified) {
+    return { sent: true, alreadyVerified: true };
+  }
+
+  const verificationToken = randomToken();
+  user.emailVerificationTokenHash = hashToken(verificationToken);
+  await user.save();
+  await sendVerificationEmail(user.email, user.name, verificationToken);
+
+  return { sent: true };
+};
+
+export const updateProfile = async (userId: string, payload: { name?: string; email?: string }) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  let emailChanged = false;
+
+  if (typeof payload.name === "string") {
+    const nextName = payload.name.trim();
+    if (!nextName) {
+      throw new AppError("name cannot be empty", 400);
+    }
+    user.name = nextName;
+  }
+
+  if (typeof payload.email === "string") {
+    const nextEmail = payload.email.trim().toLowerCase();
+    if (!nextEmail) {
+      throw new AppError("email cannot be empty", 400);
+    }
+
+    if (nextEmail !== user.email) {
+      const existingUser = await User.findOne({ email: nextEmail });
+      if (existingUser && existingUser.id !== user.id) {
+        throw new AppError("Email already in use", 409);
+      }
+      user.email = nextEmail;
+      user.emailVerified = false;
+      const verificationToken = randomToken();
+      user.emailVerificationTokenHash = hashToken(verificationToken);
+      await sendVerificationEmail(user.email, user.name, verificationToken);
+      emailChanged = true;
+    }
+  }
+
+  await user.save();
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    emailVerified: user.emailVerified,
+    emailChanged
+  };
+};
+
+export const changePassword = async (userId: string, currentPassword: string, newPassword: string) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!isValid) {
+    throw new AppError("Current password is incorrect", 400);
+  }
+
+  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  user.refreshTokenVersion += 1;
+  await user.save();
+
+  return { changed: true };
 };

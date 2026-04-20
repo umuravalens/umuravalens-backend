@@ -1,8 +1,27 @@
 import axios from "axios";
+import FormData from "form-data";
 import { NextFunction, Request, Response } from "express";
-import { AppError, ok } from "@umurava/shared-utils";
+import { AppError, logger, ok } from "@umurava/shared-utils";
 import { env } from "../config/env";
 import { forwardRequest } from "../services/proxyService";
+
+/** Pass through job/applicant service error bodies (e.g. 404) instead of masking as 502. */
+const forwardAxiosError = (res: Response, error: unknown): boolean => {
+  if (axios.isAxiosError(error) && error.response) {
+    res.status(error.response.status).json(error.response.data);
+    return true;
+  }
+  return false;
+};
+
+/** List endpoints return `{ items, pagination }` inside `data`, not a raw array. */
+const takeListItems = (data: unknown): any[] => {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object" && Array.isArray((data as { items?: unknown }).items)) {
+    return (data as { items: any[] }).items;
+  }
+  return [];
+};
 
 interface JobMetric {
   id: string;
@@ -53,50 +72,148 @@ export const getPublicJobDetails = async (req: Request, res: Response, next: Nex
     const response = await axios.get(`${env.jobServiceUrl}/jobs/public/${req.params.publicId}`);
     res.status(response.status).json(response.data);
   } catch (error) {
-    next(new AppError("Failed to fetch public job details", 502));
+    if (!forwardAxiosError(res, error)) {
+      next(new AppError("Failed to fetch public job details", 502));
+    }
   }
 };
 
+/** Multipart public apply: text fields + repeated `files` + `documentNames` JSON array (same order as files). */
 export const submitPublicApplication = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const publicId = req.params.publicId;
-    const publicJob = await axios.get(`${env.jobServiceUrl}/jobs/public/${publicId}`);
-    const job = publicJob.data?.data;
-
-    if (!job) {
-      throw new AppError("Public job not found", 404);
+    const form = new FormData();
+    const body = req.body as Record<string, string | undefined>;
+    for (const key of ["firstName", "lastName", "email", "phoneNumber", "skills", "experienceYears", "resumeUrl"]) {
+      if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
+        form.append(key, String(body[key]));
+      }
     }
-
-    const payload = {
-      ...req.body,
-      jobId: job.id,
-      recruiterId: String(job.createdBy || "")
-    };
-
-    if (!payload.recruiterId) {
-      throw new AppError("Public job owner is missing", 400);
+    const docNamesRaw = body.documentNames;
+    form.append(
+      "documentNames",
+      docNamesRaw !== undefined && docNamesRaw !== null && String(docNamesRaw).trim() !== ""
+        ? String(docNamesRaw)
+        : "[]"
+    );
+    const files = (req.files as Express.Multer.File[]) || [];
+    for (const f of files) {
+      form.append("files", f.buffer, f.originalname);
     }
-
-    const response = await axios.post(`${env.applicantServiceUrl}/public/apply`, payload);
+    const response = await axios.post(
+      `${env.applicantServiceUrl}/public/jobs/${req.params.publicId}/apply`,
+      form,
+      {
+        headers: form.getHeaders(),
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+        validateStatus: () => true
+      }
+    );
     res.status(response.status).json(response.data);
   } catch (error) {
-    next(new AppError("Failed to submit application", 502));
+    if (!forwardAxiosError(res, error)) {
+      next(new AppError("Failed to submit application", 502));
+    }
+  }
+};
+
+/** Stream file from applicant-service. Uses originalUrl so path is correct when mounted on /uploads. */
+export const proxyApplicantUploads = async (req: Request, res: Response, next: NextFunction) => {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    next();
+    return;
+  }
+  try {
+    const pathname = (req.originalUrl || "").split("?")[0];
+    const prefix = "/uploads/";
+    if (!pathname.startsWith(prefix)) {
+      next(new AppError("Invalid path", 400));
+      return;
+    }
+    const rel = pathname.slice(prefix.length);
+    if (!rel || rel.includes("..")) {
+      next(new AppError("File not found", 404));
+      return;
+    }
+    const base = env.applicantServiceUrl.replace(/\/$/, "");
+    const encoded = rel
+      .split("/")
+      .filter(Boolean)
+      .map((seg) => {
+        try {
+          return encodeURIComponent(decodeURIComponent(seg));
+        } catch {
+          return encodeURIComponent(seg);
+        }
+      })
+      .join("/");
+    const url = `${base}/uploads/${encoded}`;
+
+    const response = await axios.get(url, {
+      responseType: "stream",
+      validateStatus: () => true,
+      timeout: 120_000
+    });
+    if (response.status >= 400) {
+      logger.warn({ message: "Applicant upload GET returned non-OK", url, status: response.status });
+      next(new AppError("File not found", 404));
+      return;
+    }
+    const ct = response.headers["content-type"];
+    if (ct) {
+      res.setHeader("Content-Type", ct);
+    }
+    const cl = response.headers["content-length"];
+    if (cl) {
+      res.setHeader("Content-Length", cl as string);
+    }
+    const cd = response.headers["content-disposition"];
+    if (cd) {
+      res.setHeader("Content-Disposition", cd);
+    }
+    response.data.on("error", (err: Error) => {
+      logger.error({ message: "Upload stream read error", err: err.message, url });
+      if (!res.headersSent) {
+        next(new AppError("File transfer failed", 500));
+      }
+    });
+    res.on("close", () => {
+      if (response.data && typeof response.data.destroy === "function") {
+        response.data.destroy();
+      }
+    });
+    response.data.pipe(res);
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND" || error.code === "ECONNRESET") {
+        logger.error({ message: "Applicant service unreachable for uploads", code: error.code });
+        next(new AppError("Upload service unavailable", 503));
+        return;
+      }
+      if (error.response?.status === 404) {
+        next(new AppError("File not found", 404));
+        return;
+      }
+    }
+    logger.error({ message: "proxyApplicantUploads failed", error });
+    next(new AppError("File not found", 404));
   }
 };
 
 export const getDashboardOverview = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const headers = { "x-user-id": String(req.headers["x-user-id"] || "") };
+    const params = { page: 1, limit: 100 };
 
     const [jobsRes, applicantsRes, screeningsRes] = await Promise.all([
-      axios.get(`${env.jobServiceUrl}/jobs`, { headers }),
-      axios.get(`${env.applicantServiceUrl}/applicants`, { headers }),
-      axios.get(`${env.screeningServiceUrl}/screenings`, { headers })
+      axios.get(`${env.jobServiceUrl}/jobs`, { headers, params }),
+      axios.get(`${env.applicantServiceUrl}/applicants`, { headers, params }),
+      axios.get(`${env.screeningServiceUrl}/screenings`, { headers, params })
     ]);
 
-    const jobs = jobsRes.data?.data || [];
-    const applicants = applicantsRes.data?.data || [];
-    const screenings = screeningsRes.data?.data || [];
+    const jobs = takeListItems(jobsRes.data?.data);
+    const applicants = takeListItems(applicantsRes.data?.data);
+    const screenings = takeListItems(screeningsRes.data?.data);
 
     const screeningsByStatus = screenings.reduce(
       (acc: Record<string, number>, screening: { status: string }) => {
@@ -251,6 +368,8 @@ export const getDashboardOverview = async (req: Request, res: Response, next: Ne
       })
     );
   } catch (error) {
-    next(new AppError("Failed to load dashboard overview", 502));
+    if (!forwardAxiosError(res, error)) {
+      next(new AppError("Failed to load dashboard overview", 502));
+    }
   }
 };
