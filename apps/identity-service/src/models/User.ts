@@ -1,9 +1,16 @@
 import { Schema, model } from "mongoose";
 
-export interface UserDocument {
+export interface UserSource {
   name: string;
+  code: string;
+}
+
+export interface UserDocument {
+  firstname: string;
+  lastname: string;
   email: string;
   passwordHash: string;
+  sources: UserSource[];
   googleId?: string;
   emailVerified: boolean;
   emailVerificationTokenHash?: string;
@@ -15,9 +22,16 @@ export interface UserDocument {
 
 const userSchema = new Schema<UserDocument>(
   {
-    name: { type: String, required: true },
+    firstname: { type: String, required: true },
+    lastname: { type: String, required: true },
     email: { type: String, required: true, unique: true, lowercase: true },
     passwordHash: { type: String, required: true },
+    sources: [
+      {
+        name: { type: String, required: true },
+        code: { type: String, required: true }
+      }
+    ],
     googleId: { type: String, index: true },
     emailVerified: { type: Boolean, default: false },
     emailVerificationTokenHash: { type: String },

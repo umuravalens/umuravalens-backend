@@ -13,7 +13,7 @@ const parseCorsOrigins = (): string[] => {
 export const env = {
   port: Number(process.env.API_GATEWAY_PORT || 8080),
   jwtSecret: process.env.JWT_SECRET || "",
-  authServiceUrl: process.env.AUTH_SERVICE_URL || "http://auth-service:8081",
+  identityServiceUrl: process.env.IDENTITY_SERVICE_URL || "http://identity-service:8081",
   jobServiceUrl: process.env.JOB_SERVICE_URL || "http://job-service:8082",
   applicantServiceUrl: process.env.APPLICANT_SERVICE_URL || "http://applicant-service:8083",
   screeningServiceUrl: process.env.SCREENING_SERVICE_URL || "http://screening-service:8084",

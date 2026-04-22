@@ -5,7 +5,7 @@ import {
   getPublicJobDetails,
   proxyApplicantUploads,
   proxyToApplicants,
-  proxyToAuth,
+  proxyToIdentity,
   proxyToJobs,
   proxyToScreenings,
   submitPublicApplication
@@ -21,19 +21,21 @@ router.use("/uploads", proxyApplicantUploads);
 router.get("/public/jobs/:publicId", getPublicJobDetails);
 router.post("/public/jobs/:publicId/apply", upload.array("files", 20), submitPublicApplication);
 
-router.post("/auth/register", proxyToAuth);
-router.get("/auth/verify-email", proxyToAuth);
-router.post("/auth/resend-verification", proxyToAuth);
-router.post("/auth/login", proxyToAuth);
-router.post("/auth/google", proxyToAuth);
-router.post("/auth/refresh-token", proxyToAuth);
-router.post("/auth/forgot-password", proxyToAuth);
-router.post("/auth/reset-password", proxyToAuth);
-router.get("/auth/me", authenticate, proxyToAuth);
-router.patch("/auth/me", authenticate, proxyToAuth);
-router.patch("/auth/change-password", authenticate, proxyToAuth);
-router.post("/auth/logout", authenticate, proxyToAuth);
-router.post("/auth/logout-all", authenticate, proxyToAuth);
+router.post("/identity/login", proxyToIdentity);
+router.post("/identity/google", proxyToIdentity);
+router.post("/identity/refresh-token", proxyToIdentity);
+router.post("/identity/forgot-password", proxyToIdentity);
+router.post("/identity/reset-password", proxyToIdentity);
+router.get("/identity/me", authenticate, proxyToIdentity);
+router.patch("/identity/me", authenticate, proxyToIdentity);
+router.patch("/identity/change-password", authenticate, proxyToIdentity);
+router.post("/identity/logout", authenticate, proxyToIdentity);
+router.post("/identity/logout-all", authenticate, proxyToIdentity);
+
+router.get("/sources", authenticate, proxyToIdentity);
+router.post("/sources", authenticate, proxyToIdentity);
+router.put("/sources/:oldCode", authenticate, proxyToIdentity);
+router.delete("/sources/:code", authenticate, proxyToIdentity);
 
 router.get("/jobs", authenticate, proxyToJobs);
 router.get("/jobs/:id", authenticate, proxyToJobs);

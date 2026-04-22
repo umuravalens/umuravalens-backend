@@ -19,48 +19,6 @@ const signRefreshToken = (userId: string, email: string, tokenVersion: number) =
     expiresIn: env.refreshTokenExpiry as any
   });
 
-export const register = async (name: string, email: string, password: string) => {
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    throw new AppError("Email already in use", 409);
-  }
-
-  const passwordHash = await bcrypt.hash(password, 10);
-  const verificationToken = randomToken();
-
-  const user = await User.create({
-    name,
-    email,
-    passwordHash,
-    emailVerificationTokenHash: hashToken(verificationToken),
-    emailVerified: false
-  });
-
-  await sendVerificationEmail(user.email, user.name, verificationToken);
-
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    emailVerified: user.emailVerified
-  };
-};
-
-export const verifyEmail = async (token: string) => {
-  const tokenHash = hashToken(token);
-  const user = await User.findOne({ emailVerificationTokenHash: tokenHash });
-
-  if (!user) {
-    throw new AppError("Invalid verification token", 400);
-  }
-
-  user.emailVerified = true;
-  user.emailVerificationTokenHash = undefined;
-  await user.save();
-
-  return { verified: true };
-};
-
 export const login = async (email: string, password: string) => {
   const user = await User.findOne({ email });
   if (!user) {
@@ -82,7 +40,7 @@ export const login = async (email: string, password: string) => {
   return {
     accessToken,
     refreshToken,
-    user: { id: user.id, name: user.name, email: user.email }
+    user: { id: user.id, firstname: user.firstname, lastname: user.lastname, email: user.email }
   };
 };
 
@@ -103,37 +61,25 @@ export const loginOrRegisterWithGoogle = async (idToken: string) => {
 
   const payload = ticket.getPayload();
   const email = String(payload?.email || "").toLowerCase();
-  const emailVerified = Boolean(payload?.email_verified);
   const googleId = String(payload?.sub || "");
-  const name = String(payload?.name || "").trim();
 
-  if (!email || !googleId || !emailVerified) {
-    throw new AppError("Google account must have a verified email", 400);
+  if (!email || !googleId) {
+    throw new AppError("Invalid Google token payload", 400);
   }
 
   let user = await User.findOne({ email });
 
   if (!user) {
-    // Create a random password hash so existing local auth schema remains compatible.
-    const passwordHash = await bcrypt.hash(randomToken(), 10);
-    user = await User.create({
-      name: name || email.split("@")[0],
-      email,
-      passwordHash,
-      googleId,
-      emailVerified: true
-    });
-  } else {
-    if (user.googleId && user.googleId !== googleId) {
-      throw new AppError("This email is linked to another Google account", 409);
-    }
-    user.googleId = googleId;
-    user.emailVerified = true;
-    if (name) {
-      user.name = name;
-    }
-    await user.save();
+    throw new AppError("User not found. Registration is disabled.", 404);
   }
+
+  if (user.googleId && user.googleId !== googleId) {
+    throw new AppError("This email is linked to another Google account", 409);
+  }
+  
+  user.googleId = googleId;
+  user.emailVerified = true;
+  await user.save();
 
   const accessToken = signAccessToken(user.id, user.email);
   const refreshToken = signRefreshToken(user.id, user.email, user.refreshTokenVersion);
@@ -141,7 +87,7 @@ export const loginOrRegisterWithGoogle = async (idToken: string) => {
   return {
     accessToken,
     refreshToken,
-    user: { id: user.id, name: user.name, email: user.email }
+    user: { id: user.id, firstname: user.firstname, lastname: user.lastname, email: user.email }
   };
 };
 
@@ -195,7 +141,7 @@ export const forgotPassword = async (email: string) => {
   user.resetPasswordTokenHash = hashToken(resetToken);
   user.resetPasswordExpiresAt = new Date(Date.now() + env.resetTokenExpiryMinutes * 60 * 1000);
   await user.save();
-  await sendPasswordResetEmail(user.email, user.name, resetToken);
+  await sendPasswordResetEmail(user.email, `${user.firstname} ${user.lastname}`, resetToken);
 
   return { sent: true };
 };
@@ -228,9 +174,11 @@ export const getProfile = async (userId: string) => {
 
   return {
     id: user.id,
-    name: user.name,
+    firstname: user.firstname,
+    lastname: user.lastname,
     email: user.email,
     emailVerified: user.emailVerified,
+    sources: user.sources,
     createdAt: user.createdAt
   };
 };
@@ -250,12 +198,12 @@ export const resendVerification = async (email: string) => {
   const verificationToken = randomToken();
   user.emailVerificationTokenHash = hashToken(verificationToken);
   await user.save();
-  await sendVerificationEmail(user.email, user.name, verificationToken);
+  await sendVerificationEmail(user.email, `${user.firstname} ${user.lastname}`, verificationToken);
 
   return { sent: true };
 };
 
-export const updateProfile = async (userId: string, payload: { name?: string; email?: string }) => {
+export const updateProfile = async (userId: string, payload: { firstname?: string; lastname?: string; email?: string }) => {
   const user = await User.findById(userId);
   if (!user) {
     throw new AppError("User not found", 404);
@@ -263,12 +211,11 @@ export const updateProfile = async (userId: string, payload: { name?: string; em
 
   let emailChanged = false;
 
-  if (typeof payload.name === "string") {
-    const nextName = payload.name.trim();
-    if (!nextName) {
-      throw new AppError("name cannot be empty", 400);
-    }
-    user.name = nextName;
+  if (typeof payload.firstname === "string") {
+    user.firstname = payload.firstname.trim() || user.firstname;
+  }
+  if (typeof payload.lastname === "string") {
+    user.lastname = payload.lastname.trim() || user.lastname;
   }
 
   if (typeof payload.email === "string") {
@@ -286,7 +233,7 @@ export const updateProfile = async (userId: string, payload: { name?: string; em
       user.emailVerified = false;
       const verificationToken = randomToken();
       user.emailVerificationTokenHash = hashToken(verificationToken);
-      await sendVerificationEmail(user.email, user.name, verificationToken);
+      await sendVerificationEmail(user.email, `${user.firstname} ${user.lastname}`, verificationToken);
       emailChanged = true;
     }
   }
@@ -295,7 +242,8 @@ export const updateProfile = async (userId: string, payload: { name?: string; em
 
   return {
     id: user.id,
-    name: user.name,
+    firstname: user.firstname,
+    lastname: user.lastname,
     email: user.email,
     emailVerified: user.emailVerified,
     emailChanged

@@ -18,14 +18,14 @@ services:
     ports:
       - "${REDIS_PORT}:6379"
 
-  auth-service:
+  identity-service:
     build:
       context: .
-      dockerfile: apps/auth-service/Dockerfile
+      dockerfile: apps/identity-service/Dockerfile
     env_file: .env
     environment:
-      AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT}
-      AUTH_MONGODB_URI: ${AUTH_MONGODB_URI}
+      IDENTITY_SERVICE_PORT: ${IDENTITY_SERVICE_PORT}
+      IDENTITY_MONGODB_URI: ${IDENTITY_MONGODB_URI}
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - mongo
@@ -107,14 +107,14 @@ services:
     environment:
       API_GATEWAY_PORT: ${API_GATEWAY_PORT}
       JWT_SECRET: ${JWT_SECRET}
-      AUTH_SERVICE_URL: http://auth-service:${AUTH_SERVICE_PORT}
+      IDENTITY_SERVICE_URL: http://identity-service:${IDENTITY_SERVICE_PORT}
       JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}
       APPLICANT_SERVICE_URL: http://applicant-service:${APPLICANT_SERVICE_PORT}
       SCREENING_SERVICE_URL: http://screening-service:${SCREENING_SERVICE_PORT}
     ports:
       - "${API_GATEWAY_PORT}:${API_GATEWAY_PORT}"
     depends_on:
-      - auth-service
+      - identity-service
       - job-service
       - applicant-service
       - screening-service

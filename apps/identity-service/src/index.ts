@@ -5,20 +5,22 @@ import { logger, ok } from "@umurava/shared-utils";
 import { connectDb } from "./config/db";
 import { env } from "./config/env";
 import authRoutes from "./routes/authRoutes";
+import sourceRoutes from "./routes/sourceRoutes";
 import { errorHandler, notFound } from "./middlewares/error";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(morgan("combined", { stream: { write: (message) => logger.info({ message: message.trim() }) } }));
-app.get("/health", (_req, res) => res.json(ok({ service: "auth-service", status: "up" })));
+app.get("/health", (_req, res) => res.json(ok({ service: "identity-service", status: "up" })));
 app.use("/", authRoutes);
+app.use("/", sourceRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
 connectDb(env.mongodbUri).then(() => {
-  app.listen(env.port, () => logger.info({ message: `Auth service running on port ${env.port}` }));
+  app.listen(env.port, () => logger.info({ message: `Identity service running on port ${env.port}` }));
 }).catch((error) => {
-  logger.error({ message: "Failed to start auth service", error });
+  logger.error({ message: "Failed to start identity service", error });
   process.exit(1);
 });

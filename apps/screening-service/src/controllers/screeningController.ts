@@ -27,7 +27,12 @@ export const runScreening = async (req: Request, res: Response, next: NextFuncti
       throw new AppError("jobId is required", 400);
     }
 
-    const screening = await Screening.create({ jobId, createdBy: recruiterId, status: "pending", results: [] });
+    const screening = await Screening.create({ 
+        jobId, 
+        recruiterId, 
+        status: "pending", 
+        stats: { totalApplicants: 0, shortlistedCount: 0, topScore: 0 }
+    });
     await screeningQueue.add("run-screening", { screeningId: screening.id, jobId });
 
     res.status(202).json(ok(screening));
@@ -40,7 +45,7 @@ export const listScreenings = async (req: Request, res: Response, next: NextFunc
   try {
     const recruiterId = getUserId(req);
     const { page, limit, skip } = getPagination(req);
-    const query: any = { createdBy: recruiterId };
+    const query: any = { recruiterId };
     if (req.query.jobId) query.jobId = String(req.query.jobId);
     if (req.query.status) query.status = String(req.query.status);
 
@@ -67,11 +72,11 @@ export const listScreenings = async (req: Request, res: Response, next: NextFunc
 export const getScreeningStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getUserId(req);
-    const screening = await Screening.findOne({ _id: req.params.id, createdBy: recruiterId });
+    const screening = await Screening.findOne({ _id: req.params.id, recruiterId });
     if (!screening) {
       throw new AppError("Screening not found", 404);
     }
-    res.json(ok({ id: screening.id, jobId: screening.jobId, status: screening.status }));
+    res.json(ok({ id: screening.id, jobId: screening.jobId, status: screening.status, stats: screening.stats }));
   } catch (error) {
     next(error);
   }
@@ -80,11 +85,16 @@ export const getScreeningStatus = async (req: Request, res: Response, next: Next
 export const getScreeningResults = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getUserId(req);
-    const screening = await Screening.findOne({ _id: req.params.id, createdBy: recruiterId });
+    const screening = await Screening.findOne({ _id: req.params.id, recruiterId });
     if (!screening) {
       throw new AppError("Screening not found", 404);
     }
-    res.json(ok({ id: screening.id, jobId: screening.jobId, status: screening.status, results: screening.results }));
+    res.json(ok({ 
+        id: screening.id, 
+        jobId: screening.jobId, 
+        status: screening.status, 
+        stats: screening.stats
+    }));
   } catch (error) {
     next(error);
   }

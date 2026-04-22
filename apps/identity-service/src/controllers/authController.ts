@@ -3,33 +3,6 @@ import { ok, AppError } from "@umurava/shared-utils";
 import * as authService from "../services/authService";
 import { AuthenticatedRequest } from "../middlewares/auth";
 
-export const registerUser = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      throw new AppError("name, email and password are required", 400);
-    }
-
-    const data = await authService.register(name, email, password);
-    res.status(201).json(ok(data));
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const verifyEmail = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const token = String(req.query.token || "");
-    if (!token) {
-      throw new AppError("token is required", 400);
-    }
-    const data = await authService.verifyEmail(token);
-    res.json(ok(data));
-  } catch (error) {
-    next(error);
-  }
-};
-
 export const loginUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
@@ -162,12 +135,12 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response, ne
       throw new AppError("Unauthorized", 401);
     }
 
-    const { name, email } = req.body;
-    if (typeof name === "undefined" && typeof email === "undefined") {
-      throw new AppError("At least one field (name or email) is required", 400);
+    const { firstname, lastname, email } = req.body;
+    if (typeof firstname === "undefined" && typeof lastname === "undefined" && typeof email === "undefined") {
+      throw new AppError("At least one field (firstname, lastname or email) is required", 400);
     }
 
-    const data = await authService.updateProfile(userId, { name, email });
+    const data = await authService.updateProfile(userId, { firstname, lastname, email });
     res.json(ok(data));
   } catch (error) {
     next(error);

@@ -65,7 +65,9 @@ const normalizeDocuments = (raw: unknown): ApplicantDocumentAttachment[] => {
     out.push({
       documentName,
       storedFileName,
-      originalFileName: doc.originalFileName ? String(doc.originalFileName) : ""
+      originalFileName: doc.originalFileName ? String(doc.originalFileName) : "",
+      uploadDate: doc.uploadDate ? new Date(String(doc.uploadDate)) : new Date(),
+      fileUrl: doc.fileUrl ? String(doc.fileUrl) : `/uploads/${storedFileName}`
     });
   }
   return out;
@@ -82,27 +84,21 @@ const getPagination = (req: Request) => {
 export const addApplicant = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getRecruiterId(req);
-    const { jobId, name, firstName, lastName, email, phoneNumber, skills, experienceYears, resumeUrl } = req.body;
-    if (!jobId || !name || !email || !skills || experienceYears === undefined) {
-      throw new AppError("jobId, name, email, skills and experienceYears are required", 400);
+    const { jobId, name, email, profileData, resumeUrl, application_source } = req.body;
+    if (!jobId || !name || !email || !profileData || !application_source) {
+      throw new AppError("jobId, name, email, profileData and application_source are required", 400);
     }
-
-    const normalizedFirstName = firstName ? String(firstName).trim() : undefined;
-    const normalizedLastName = lastName ? String(lastName).trim() : undefined;
 
     const applicant = await Applicant.create({
       jobId,
       name,
-      firstName: normalizedFirstName,
-      lastName: normalizedLastName,
       email,
-      phoneNumber: phoneNumber ? String(phoneNumber).trim() : undefined,
-      skills: parseSkills(skills),
-      experienceYears: Number(experienceYears),
+      profileData,
+      application_source,
       resumeUrl,
       documents: normalizeDocuments(req.body.documents),
-      createdBy: recruiterId,
-      source: "recruiter"
+      source: "platform",
+      status: "pending"
     });
 
     res.status(201).json(ok(withApplicantId(applicant)));
@@ -111,113 +107,137 @@ export const addApplicant = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
-export const createPublicApplicantWithFiles = async (req: Request, res: Response, next: NextFunction) => {
+export const applyApplicant = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const publicId = req.params.publicId;
-    const jobRes = await axios.get(`${env.jobServiceUrl}/jobs/public/${publicId}`, { validateStatus: () => true });
+    const { jobId, source_code, verifiedData, otherDocuments, resumeFile } = req.body;
+
+    if (!jobId || !source_code || !verifiedData) {
+      throw new AppError("jobId, source_code and verifiedData are required", 400);
+    }
+
+    // Verify Job and get required documents
+    const jobRes = await axios.get(`${env.jobServiceUrl}/jobs/internal/${jobId}`, { validateStatus: () => true });
     if (jobRes.status !== 200 || !jobRes.data?.success || !jobRes.data?.data) {
-      throw new AppError("Public job not found", 404);
+      throw new AppError("Job not found", 404);
     }
-    const job = jobRes.data.data as { id: string; createdBy: string; status?: string };
-    if (job.status && job.status !== "published") {
-      throw new AppError("This job is not accepting applications", 400);
+    const job = jobRes.data.data;
+
+    // Verify Source
+    const sourceExists = job.sources.some((s: any) => s.code === source_code);
+    if (!sourceExists) {
+        throw new AppError("Invalid source code for this job", 400);
     }
 
-    const { firstName, lastName, email, phoneNumber, skills, experienceYears, resumeUrl } = req.body;
-    if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !phoneNumber ||
-      skills === undefined ||
-      skills === null ||
-      skills === "" ||
-      experienceYears === undefined
-    ) {
-      throw new AppError(
-        "firstName, lastName, email, phoneNumber, skills and experienceYears are required",
-        400
-      );
+    // Document Validation
+    const requiredDocs = job.requiredDocuments || [];
+    const providedDocNames = [
+        ...(otherDocuments || []).map((d: any) => d.documentName),
+        resumeFile?.documentName
+    ].filter(Boolean);
+
+    for (const reqDoc of requiredDocs) {
+        if (reqDoc.isRequired && !providedDocNames.includes(reqDoc.documentType)) {
+            throw new AppError(`Missing required document: ${reqDoc.documentType}`, 400);
+        }
     }
 
-    const files = (req.files as Express.Multer.File[]) || [];
-    let documentNames: string[] = [];
-    const rawNames = req.body.documentNames;
-    if (rawNames === undefined || rawNames === null || rawNames === "") {
-      documentNames = [];
-    } else if (typeof rawNames === "string") {
-      try {
-        documentNames = JSON.parse(rawNames) as string[];
-      } catch {
-        throw new AppError(
-          'documentNames must be a JSON array of strings (e.g. ["Resume","Cover letter"]) or omitted if no files',
-          400
-        );
-      }
-    } else if (Array.isArray(rawNames)) {
-      documentNames = rawNames.map((x) => String(x));
+    // Check if extra documents are allowed (if they match required types or we allow any)
+    const validDocTypes = requiredDocs.map((rd: any) => rd.documentType);
+    for (const docName of providedDocNames) {
+        if (!validDocTypes.includes(docName)) {
+            throw new AppError(`Document type ${docName} is not required/allowed for this job`, 400);
+        }
     }
 
-    if (!Array.isArray(documentNames)) {
-      documentNames = [];
-    }
-    if (files.length !== documentNames.length) {
-      throw new AppError(
-        `documentNames must have one label per file (${files.length} file(s), ${documentNames.length} name(s))`,
-        400
-      );
-    }
-
-    const docList: ApplicantDocumentAttachment[] = files.map((file, i) => ({
-      documentName: String(documentNames[i]).trim(),
-      storedFileName: file.filename,
-      originalFileName: file.originalname || ""
+    const docList: ApplicantDocumentAttachment[] = (otherDocuments || []).map((d: any) => ({
+        ...d,
+        uploadDate: new Date(),
+        fileUrl: `/uploads/${d.storedFileName}`
     }));
 
-    for (const d of docList) {
-      if (!d.documentName) {
-        throw new AppError("Each document needs a non-empty name in documentNames", 400);
-      }
+    if (resumeFile) {
+        docList.push({
+            ...resumeFile,
+            uploadDate: new Date(),
+            fileUrl: `/uploads/${resumeFile.storedFileName}`
+        });
     }
 
-    const normalizedFirstName = String(firstName).trim();
-    const normalizedLastName = String(lastName).trim();
-    const fullName = `${normalizedFirstName} ${normalizedLastName}`.trim();
-
-    let resumeUrlOut = resumeUrl ? String(resumeUrl).trim() : undefined;
-    if (!resumeUrlOut && docList.length) {
-      const resumeDoc = docList.find((d) => /resume|cv/i.test(d.documentName));
-      if (resumeDoc) {
-        resumeUrlOut = `/uploads/${resumeDoc.storedFileName}`;
-      }
-    }
+    const resumeDoc = docList.find(d => d.documentName === 'Resume');
+    const resumeUrl = resumeDoc ? resumeDoc.fileUrl : "";
 
     const applicant = await Applicant.create({
-      jobId: job.id,
-      name: fullName,
-      firstName: normalizedFirstName,
-      lastName: normalizedLastName,
-      email: String(email).trim(),
-      phoneNumber: String(phoneNumber).trim(),
-      skills: parseSkills(skills),
-      experienceYears: Number(experienceYears),
-      resumeUrl: resumeUrlOut,
-      documents: docList,
-      createdBy: String(job.createdBy),
-      source: "public"
+      jobId,
+      source: "upload",
+      application_source: source_code,
+      status: "draft",
+      name: verifiedData.name,
+      email: verifiedData.email,
+      profileData: verifiedData.profileData,
+      resumeUrl: resumeUrl,
+      documents: docList
     });
 
-    res.status(201).json(ok(withApplicantId(applicant)));
+    res.status(201).json(ok(serializeApplicant(applicant)));
   } catch (error) {
     next(error);
   }
+};
+
+export const verifyApplicant = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { applicantId } = req.params;
+        const updatedData = req.body;
+
+        const applicant = await Applicant.findById(applicantId);
+        if (!applicant) {
+            throw new AppError("Applicant not found", 404);
+        }
+
+        if (applicant.status !== "draft") {
+            throw new AppError("Only draft applications can be verified", 400);
+        }
+
+        // Check for changes - Simple comparison of email for now as per instructions "if the response comes as it was without any changes"
+        // Instruction: "if the response comes as it was without any changes... change status to pending... if there is a change return the user with the draft response still"
+        // We'll compare some key fields or the whole object.
+        const isModified = JSON.stringify(updatedData.profileData) !== JSON.stringify(applicant.profileData);
+
+        if (isModified) {
+            // Update the draft and return it
+            applicant.profileData = updatedData.profileData;
+            applicant.name = updatedData.name;
+            applicant.email = updatedData.email;
+            await applicant.save();
+            return res.json(ok(serializeApplicant(applicant)));
+        }
+
+        // No changes, proceed to pending
+        // Check for existing application with same email and specific statuses
+        const existing = await Applicant.findOne({
+            email: applicant.email,
+            status: { $in: ["pending", "shortlisted", "rejected"] },
+            jobId: applicant.jobId
+        });
+
+        if (existing) {
+            throw new AppError("An application with this email already exists for this job", 400);
+        }
+
+        applicant.status = "pending";
+        await applicant.save();
+
+        res.json(ok(serializeApplicant(applicant)));
+    } catch (error) {
+        next(error);
+    }
 };
 
 export const listApplicants = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getRecruiterId(req);
     const { page, limit, skip } = getPagination(req);
-    const query: any = { createdBy: recruiterId };
+    const query: any = { status: { $ne: "draft" } }; // Typically recruiter only sees non-drafts
     if (req.query.jobId) {
       query.jobId = String(req.query.jobId);
     }
@@ -320,6 +340,27 @@ export const updateApplicant = async (req: Request, res: Response, next: NextFun
       payload,
       { new: true, runValidators: true }
     );
+    if (!applicant) {
+      throw new AppError("Applicant not found", 404);
+    }
+
+    res.json(ok(serializeApplicant(applicant)));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateApplicantAIInternal = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { aiAnalysis } = req.body;
+
+    const applicant = await Applicant.findByIdAndUpdate(
+      id,
+      { aiAnalysis },
+      { new: true }
+    );
+
     if (!applicant) {
       throw new AppError("Applicant not found", 404);
     }

@@ -31,18 +31,33 @@ const validateRequirements = (requirements: any) => {
     throw new AppError("requirements.skills must contain at least one skill", 400);
   }
 
-  const experience = Number(requirements.experience);
-  if (Number.isNaN(experience) || experience < 0) {
-    throw new AppError("requirements.experience must be a positive number or zero", 400);
+  const experienceYears = Number(requirements.experienceYears);
+  if (Number.isNaN(experienceYears) || experienceYears < 0) {
+    throw new AppError("requirements.experienceYears must be a positive number or zero", 400);
   }
 
-  return { skills, experience };
+  const location = String(requirements.location || "").trim();
+  if (!location) {
+    throw new AppError("requirements.location is required", 400);
+  }
+
+  return { skills, experienceYears, location };
 };
 
 export const createJob = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getUserId(req);
-    const { title, description, department, requirements, location, employmentType, status } = req.body;
+    const { 
+      title, 
+      description, 
+      sources, 
+      requirements, 
+      status, 
+      threshold, 
+      shortlist, 
+      requiredDocuments 
+    } = req.body;
+
     if (!title || !description) {
       throw new AppError("title and description are required", 400);
     }
@@ -50,14 +65,15 @@ export const createJob = async (req: Request, res: Response, next: NextFunction)
     const normalizedRequirements = validateRequirements(requirements);
 
     const job = await Job.create({
+      recruiterId,
       title,
       description,
-      department: typeof department === "string" ? department.trim() : undefined,
+      sources: Array.isArray(sources) ? sources : [],
       requirements: normalizedRequirements,
-      location,
-      employmentType,
-      status,
-      createdBy: recruiterId
+      status: status || "open",
+      threshold: Number(threshold) || 0,
+      shortlist: Number(shortlist) || 0,
+      requiredDocuments: Array.isArray(requiredDocuments) ? requiredDocuments : []
     });
 
     res.status(201).json(ok({ ...job.toObject(), publicUrl: `/public/jobs/${job.publicId}` }));
@@ -70,7 +86,7 @@ export const listJobs = async (req: Request, res: Response, next: NextFunction) 
   try {
     const recruiterId = getUserId(req);
     const { page, limit, skip } = getPagination(req);
-    const query: any = { createdBy: recruiterId };
+    const query: any = { recruiterId };
     if (req.query.status) {
       query.status = String(req.query.status);
     }
@@ -97,7 +113,7 @@ export const listJobs = async (req: Request, res: Response, next: NextFunction) 
 export const getJobById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getUserId(req);
-    const job = await Job.findOne({ _id: req.params.id, createdBy: recruiterId });
+    const job = await Job.findOne({ _id: req.params.id, recruiterId });
     if (!job) {
       throw new AppError("Job not found", 404);
     }
@@ -115,7 +131,7 @@ export const updateJob = async (req: Request, res: Response, next: NextFunction)
       payload.requirements = validateRequirements(payload.requirements);
     }
 
-    const job = await Job.findOneAndUpdate({ _id: req.params.id, createdBy: recruiterId }, payload, {
+    const job = await Job.findOneAndUpdate({ _id: req.params.id, recruiterId }, payload, {
       new: true,
       runValidators: true
     });
@@ -131,7 +147,7 @@ export const updateJob = async (req: Request, res: Response, next: NextFunction)
 export const deleteJob = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getUserId(req);
-    const job = await Job.findOneAndDelete({ _id: req.params.id, createdBy: recruiterId });
+    const job = await Job.findOneAndDelete({ _id: req.params.id, recruiterId });
     if (!job) {
       throw new AppError("Job not found", 404);
     }
@@ -145,8 +161,8 @@ export const publishJob = async (req: Request, res: Response, next: NextFunction
   try {
     const recruiterId = getUserId(req);
     const job = await Job.findOneAndUpdate(
-      { _id: req.params.id, createdBy: recruiterId },
-      { status: "published" },
+      { _id: req.params.id, recruiterId },
+      { status: "open" },
       { new: true, runValidators: true }
     );
     if (!job) {
@@ -168,15 +184,13 @@ export const getPublicJobByPublicId = async (req: Request, res: Response, next: 
     res.json(
       ok({
         id: job.id,
-        createdBy: job.createdBy,
+        recruiterId: job.recruiterId,
         publicId: job.publicId,
         title: job.title,
         description: job.description,
-        department: job.department,
         requirements: job.requirements,
-        location: job.location,
-        employmentType: job.employmentType,
-        status: job.status
+        status: job.status,
+        requiredDocuments: job.requiredDocuments
       })
     );
   } catch (error) {
