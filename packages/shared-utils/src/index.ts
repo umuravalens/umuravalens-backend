@@ -3,7 +3,7 @@ import { createLogger, format, transports } from "winston";
 
 export const logger = createLogger({
   level: process.env.LOG_LEVEL || "info",
-  format: format.combine(format.timestamp(), format.json()),
+  format: format.combine(format.errors({ stack: true }), format.timestamp(), format.json()),
   transports: [new transports.Console()]
 });
 
@@ -13,17 +13,22 @@ export class AppError extends Error {
   constructor(message: string, statusCode = 500) {
     super(message);
     this.statusCode = statusCode;
+    Object.setPrototypeOf(this, AppError.prototype);
   }
 }
 
-export const ok = <T>(data: T): ApiResponse<T> => ({
-  success: true,
-  data,
-  error: null
-});
+export const ok = <T>(data: T): ApiResponse<T> => {
+  return {
+    success: true,
+    data,
+    error: null
+  };
+};
 
-export const fail = (error: string): ApiResponse<null> => ({
-  success: false,
-  data: null,
-  error
-});
+export const fail = (error: string): ApiResponse<null> => {
+  return {
+    success: false,
+    data: null,
+    error
+  };
+};

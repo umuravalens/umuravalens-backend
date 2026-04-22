@@ -1,20 +1,27 @@
 import { Router } from "express";
 import {
   addApplicant,
-  createPublicApplicantWithFiles,
+  applyApplicant,
+  verifyApplicant,
   deleteApplicant,
   getApplicantById,
   listApplicants,
   listApplicantsByJobInternal,
   listApplicantsByJob,
-  updateApplicant
+  updateApplicant,
+  updateApplicantAIInternal
 } from "../controllers/applicantController";
+import { extractInfo } from "../controllers/extractInfoController";
 import { upload } from "../utils/upload";
 
 const router = Router();
 
-router.post("/public/jobs/:publicId/apply", upload.array("files", 20), createPublicApplicantWithFiles);
+router.post("/analyze", upload.single("resume"), extractInfo);
+router.post("/apply", applyApplicant);
+router.post("/verify/:applicantId", verifyApplicant);
+
 router.get("/applicants/internal/:jobId", listApplicantsByJobInternal);
+router.patch("/applicants/internal/:id/ai", updateApplicantAIInternal);
 router.post("/applicants", addApplicant);
 router.get("/applicants", listApplicants);
 router.get("/applicants/:jobId", listApplicantsByJob);

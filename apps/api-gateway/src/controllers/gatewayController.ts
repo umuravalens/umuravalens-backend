@@ -55,8 +55,8 @@ const handle = async (req: Request, res: Response, next: NextFunction, base: str
   }
 };
 
-export const proxyToAuth = (req: Request, res: Response, next: NextFunction) =>
-  handle(req, res, next, env.authServiceUrl, req.path.replace(/^\/auth/, "") || "/");
+export const proxyToIdentity = (req: Request, res: Response, next: NextFunction) =>
+  handle(req, res, next, env.identityServiceUrl, req.path.replace(/^\/identity/, "") || "/");
 
 export const proxyToJobs = (req: Request, res: Response, next: NextFunction) =>
   handle(req, res, next, env.jobServiceUrl, req.path);
@@ -240,8 +240,7 @@ export const getDashboardOverview = async (req: Request, res: Response, next: Ne
         : Number(
             (
               completedResults.reduce((sum: number, screening: any) => {
-                const topResult = Array.isArray(screening.results) ? screening.results[0] : null;
-                return sum + (topResult?.score || 0);
+                return sum + (screening.stats?.topScore || 0);
               }, 0) / completedResults.length
             ).toFixed(2)
           );

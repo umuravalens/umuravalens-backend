@@ -1,41 +1,68 @@
 import { Schema, model } from "mongoose";
 import crypto from "crypto";
 
+export interface JobSource {
+  name: string;
+  code: string;
+  applicantCount: number;
+}
+
+export interface RequiredDocument {
+  documentType: string;
+  isRequired: boolean;
+  sendToAI: boolean;
+}
+
 export interface JobDocument {
+  recruiterId: string;
   title: string;
   description: string;
-  department?: string;
+  sources: JobSource[];
   requirements: {
     skills: string[];
-    experience: number;
+    experienceYears: number;
+    location: string;
   };
-  location?: string;
-  employmentType?: string;
-  status: "draft" | "published" | "closed";
-  createdBy: string;
+  status: "open" | "closed" | "archived";
+  threshold: number;
+  shortlist: number;
+  requiredDocuments: RequiredDocument[];
   publicId: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 const jobSchema = new Schema<JobDocument>(
   {
+    recruiterId: { type: String, required: true, index: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true, trim: true },
-    department: { type: String, trim: true },
+    sources: [
+      {
+        name: { type: String, required: true },
+        code: { type: String, required: true },
+        applicantCount: { type: Number, default: 0 }
+      }
+    ],
     requirements: {
-      skills: {
-        type: [String],
-        required: true,
-        validate: {
-          validator: (skills: string[]) => Array.isArray(skills) && skills.length > 0,
-          message: "At least one required skill is needed"
-        }
-      },
-      experience: { type: Number, required: true, min: 0 }
+      skills: { type: [String], required: true },
+      experienceYears: { type: Number, required: true, min: 0 },
+      location: { type: String, required: true }
     },
-    location: { type: String },
-    employmentType: { type: String },
-    status: { type: String, enum: ["draft", "published", "closed"], default: "published" },
-    createdBy: { type: String, required: true, index: true },
+    status: { 
+      type: String, 
+      enum: ["open", "closed", "archived"], 
+      default: "open" 
+    },
+    threshold: { type: Number, default: 0 },
+    shortlist: { type: Number, default: 0 },
+    requiredDocuments: [
+      {
+        documentType: { type: String, required: true },
+        isRequired: { type: Boolean, default: false },
+        sendToAI: { type: Boolean, default: false }
+      }
+    ],
     publicId: { type: String, unique: true, index: true }
   },
   { timestamps: true }

@@ -8,6 +8,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "outDir": "dist"
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@umurava/shared-types": ["packages/shared-types/src"],
+      "@umurava/shared-utils": ["packages/shared-utils/src"]
+    }
   }
 }

@@ -8,19 +8,13 @@ import {
   logoutAll,
   me,
   refreshAccessToken,
-  registerUser,
-  resendVerification,
   resetPassword,
-  updateProfile,
-  verifyEmail
+  updateProfile
 } from "../controllers/authController";
 import { authenticate } from "../middlewares/auth";
 
 const router = Router();
 
-router.post("/register", registerUser);
-router.get("/verify-email", verifyEmail);
-router.post("/resend-verification", resendVerification);
 router.post("/login", loginUser);
 router.post("/google", googleAuth);
 router.post("/refresh-token", refreshAccessToken);
