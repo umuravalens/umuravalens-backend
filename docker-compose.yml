@@ -25,7 +25,8 @@ services:
     env_file: .env
     environment:
       IDENTITY_SERVICE_PORT: ${IDENTITY_SERVICE_PORT}
-      IDENTITY_MONGODB_URI: ${IDENTITY_MONGODB_URI}
+      IDENTITY_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/identitydb?authSource=admin
+      AUTH_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/identitydb?authSource=admin
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - mongo
@@ -37,7 +38,7 @@ services:
     env_file: .env
     environment:
       JOB_SERVICE_PORT: ${JOB_SERVICE_PORT}
-      JOB_MONGODB_URI: ${JOB_MONGODB_URI}
+      JOB_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/jobdb?authSource=admin
     depends_on:
       - mongo
 
@@ -48,9 +49,11 @@ services:
     env_file: .env
     environment:
       APPLICANT_SERVICE_PORT: ${APPLICANT_SERVICE_PORT}
-      APPLICANT_MONGODB_URI: ${APPLICANT_MONGODB_URI}
+      APPLICANT_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/applicantdb?authSource=admin
       UPLOAD_DIR: /app/apps/applicant-service/src/uploads
       JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
     volumes:
       # Same files on your PC as inside the container (Windows: under your repo path)
       - ./apps/applicant-service/src/uploads:/app/apps/applicant-service/src/uploads
@@ -65,8 +68,8 @@ services:
     env_file: .env
     environment:
       SCREENING_SERVICE_PORT: ${SCREENING_SERVICE_PORT}
-      SCREENING_MONGODB_URI: ${SCREENING_MONGODB_URI}
-      REDIS_URL: ${REDIS_URL}
+      SCREENING_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/screeningdb?authSource=admin
+      REDIS_URL: redis://redis:6379
     depends_on:
       - mongo
       - redis
@@ -77,8 +80,8 @@ services:
       dockerfile: apps/worker-service/Dockerfile
     env_file: .env
     environment:
-      SCREENING_MONGODB_URI: ${SCREENING_MONGODB_URI}
-      REDIS_URL: ${REDIS_URL}
+      SCREENING_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/screeningdb?authSource=admin
+      REDIS_URL: redis://redis:6379
       JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}
       APPLICANT_SERVICE_URL: http://applicant-service:${APPLICANT_SERVICE_PORT}
       NOTIFICATION_SERVICE_URL: http://notification-service:${NOTIFICATION_SERVICE_PORT}

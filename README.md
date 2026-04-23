@@ -5,21 +5,22 @@ Production-ready microservices backend for the UmuravaLens recruitment platform,
 ## Features
 
 - Microservices architecture with API Gateway
-- Authentication with bcrypt + JWT
+- Authentication with bcrypt + JWT (Identity Service)
 - Jobs and applicants management
-- CSV and PDF upload support (no AI processing)
+- **AI-Powered Resume Analysis** (Gemini AI integration)
 - Screening workflow with queue-driven processing
 - Deterministic applicant ranking (skills + experience)
 - Real-time screening status updates via Socket.io
 - Shared packages for consistent types and utilities
 - Dockerized deployment with `docker-compose`
+- Source-first monorepo architecture for high-speed development
 
 ## Services
 
 - `api-gateway` - Entry point and routing/proxy layer
-- `auth-service` - Register/login and token generation
+- `identity-service` - User accounts, profile, and candidate source management
 - `job-service` - CRUD for jobs
-- `applicant-service` - Manual applicants, CSV import, PDF upload metadata
+- `applicant-service` - AI resume analysis, applications intake, and candidate verification
 - `screening-service` - Screening orchestration and status/results APIs
 - `worker-service` - BullMQ consumer for screening processing
 - `notification-service` - Socket.io event broadcasting and internal event ingestion
@@ -88,16 +89,19 @@ Socket endpoint: `ws://localhost:8085`
 All external calls go through API Gateway (`http://localhost:8080`).
 Interactive Swagger UI is available at `http://localhost:8080/docs`.
 
-### Auth
-- `POST /auth/register`
-- `GET /auth/verify-email?token=...`
-- `POST /auth/login`
-- `POST /auth/refresh-token`
-- `POST /auth/forgot-password`
-- `POST /auth/reset-password`
-- `GET /auth/me` (Bearer token required)
-- `POST /auth/logout` (Bearer token required)
-- `POST /auth/logout-all` (Bearer token required)
+### Identity
+- `POST /identity/login` - Local authentication
+- `POST /identity/google` - Social authentication (OAuth 2.0)
+- `POST /identity/refresh-token`
+- `POST /identity/forgot-password`
+- `POST /identity/reset-password`
+- `GET /identity/me` (Bearer token required)
+- `PATCH /identity/me` (Update profiles)
+- `PATCH /identity/change-password`
+- `POST /identity/logout` 
+- `POST /identity/logout-all`
+- `GET /sources` - List candidate traffic sources (Bearer token required)
+- `POST /sources` - Add new source code (e.g. LINKEDIN)
 
 ### Jobs
 - `POST /jobs` (Bearer token required)
@@ -109,7 +113,10 @@ Interactive Swagger UI is available at `http://localhost:8080/docs`.
 - `GET /public/jobs/:publicId` (public job details for applicants)
 
 ### Applicants
-- `POST /applicants` (Bearer token required)
+- `POST /applicants/analyze` - AI Resume parsing (Multipart PDF; Bearer token required)
+- `POST /applicants/apply` - Submit standard application (JSON; Bearer token required)
+- `POST /applicants/verify/:applicantId` - Verify candidate (Bearer token required)
+- `POST /applicants` (Manual creation; Bearer token required)
 - `GET /applicants` (Bearer token required, optional query: `jobId`)
 - `POST /public/jobs/:publicId/apply` (public application: multipart fields + optional `files`; no auth)
 - `GET /uploads/:filename` (serve uploaded file; use `documents[].fileUrl` from applicant responses; no auth)
@@ -152,18 +159,19 @@ Error shape:
 ## Setup
 
 ### 1) Create environment file
-
-Copy `.env.example` to `.env`:
-
+ 
+Copy the sample config to the root directory:
+ 
 ```bash
 cp .env.example .env
 ```
-
+ 
 (Windows PowerShell)
-
+ 
 ```powershell
 Copy-Item .env.example .env
 ```
+*Note: A single `.env` at the root now configures all microservices.*
 
 ### 2) Run with Docker Compose
 
@@ -186,17 +194,17 @@ This starts:
 - Notifications: `GET http://localhost:8085/health`
 
 ## Local Development (without Docker)
-
+ 
 ```bash
 npm install
-npm run dev --workspaces
+npm run dev
 ```
-
-Make sure MongoDB and Redis are available and `.env` is configured.
+ 
+Make sure MongoDB and Redis are available. The project uses `tsx watch --env-file .env` for high-speed hot-reloading across the entire monorepo.
 
 ## Notes
 
-- No AI logic or external AI APIs are included.
-- Architecture is AI-ready: screening workflow can later be extended with AI ranking providers behind worker strategies.
-- Logging is implemented with Winston via `@umurava/shared-utils`.
-- Global error handlers are implemented in each API service.
+- **AI Integration**: Google Gemini AI is integrated for automated resume parsing in the `applicant-service`.
+- **Monorepo Architecture**: Uses NPM Workspaces. Shared packages (`shared-types`, `shared-utils`) are consumed directly from source during development.
+- **Logging**: Implemented with Winston via `@umurava/shared-utils`, including full error stack serialization.
+- **Global error handlers**: Implemented in each API service and the Gateway.

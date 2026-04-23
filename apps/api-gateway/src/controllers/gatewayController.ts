@@ -62,7 +62,7 @@ export const proxyToJobs = (req: Request, res: Response, next: NextFunction) =>
   handle(req, res, next, env.jobServiceUrl, req.path);
 
 export const proxyToApplicants = (req: Request, res: Response, next: NextFunction) =>
-  handle(req, res, next, env.applicantServiceUrl, req.path);
+  handle(req, res, next, env.applicantServiceUrl, req.path.replace(/^\/applicants/, "") || "/");
 
 export const proxyToScreenings = (req: Request, res: Response, next: NextFunction) =>
   handle(req, res, next, env.screeningServiceUrl, req.path);
