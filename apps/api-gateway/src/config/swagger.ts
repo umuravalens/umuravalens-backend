@@ -11,9 +11,9 @@ const swaggerOptions: swaggerJsdoc.Options = {
     },
     servers: [{ url: "http://localhost:8080", description: "Local gateway" }],
     tags: [
-      { name: "Auth Service", description: "Identity, sessions, profile, and account security endpoints" },
-      { name: "Job Service", description: "Job posting and public job access endpoints" },
-      { name: "Applicant Service", description: "Applicant management and application intake endpoints" },
+      { name: "Identity Service", description: "User accounts, authentication, profiles, and candidate source management" },
+      { name: "Job Service", description: "Job lifecycle (draft, publish, close) and vacancy management" },
+      { name: "Applicant Service", description: "Application intake, recruitment workflow, and resume processing" },
       { name: "Screening Service", description: "AI screening orchestration and status endpoints" },
       { name: "Dashboard Service", description: "Aggregated analytics endpoints served by the gateway" }
     ],
@@ -33,62 +33,9 @@ const swaggerOptions: swaggerJsdoc.Options = {
       }
     },
     paths: {
-      "/auth/register": {
-        post: {
-          tags: ["Auth Service"],
-          summary: "Register account",
-          security: [],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["name", "email", "password"],
-                  properties: {
-                    name: { type: "string" },
-                    email: { type: "string", format: "email" },
-                    password: { type: "string", minLength: 6 }
-                  }
-                }
-              }
-            }
-          },
-          responses: { "201": { description: "Registered" } }
-        }
-      },
-      "/auth/verify-email": {
-        get: {
-          tags: ["Auth Service"],
-          summary: "Verify email",
-          security: [],
-          parameters: [{ in: "query", name: "token", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Verified" } }
-        }
-      },
-      "/auth/resend-verification": {
-        post: {
-          tags: ["Auth Service"],
-          summary: "Resend verification email",
-          security: [],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["email"],
-                  properties: { email: { type: "string", format: "email" } }
-                }
-              }
-            }
-          },
-          responses: { "200": { description: "Verification email initiated" } }
-        }
-      },
       "/auth/login": {
         post: {
-          tags: ["Auth Service"],
+          tags: ["Identity Service"],
           summary: "Login with email/password",
           security: [],
           requestBody: {
@@ -111,7 +58,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
       },
       "/auth/google": {
         post: {
-          tags: ["Auth Service"],
+          tags: ["Identity Service"],
           summary: "Login or signup with Google",
           security: [],
           description: "Frontend sends Google ID token from Google Sign-In. If user does not exist, account is created.",
@@ -134,7 +81,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
       },
       "/auth/refresh-token": {
         post: {
-          tags: ["Auth Service"],
+          tags: ["Identity Service"],
           summary: "Refresh access token",
           security: [],
           requestBody: {
@@ -154,7 +101,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
       },
       "/auth/forgot-password": {
         post: {
-          tags: ["Auth Service"],
+          tags: ["Identity Service"],
           summary: "Request password reset",
           security: [],
           requestBody: {
@@ -174,7 +121,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
       },
       "/auth/reset-password": {
         post: {
-          tags: ["Auth Service"],
+          tags: ["Identity Service"],
           summary: "Reset password with token",
           security: [],
           requestBody: {
@@ -257,10 +204,70 @@ const swaggerOptions: swaggerJsdoc.Options = {
       },
       "/auth/logout-all": {
         post: {
-          tags: ["Auth Service"],
+          tags: ["Identity Service"],
           summary: "Logout all sessions",
           security: [{ bearerAuth: [] }],
           responses: { "200": { description: "Logged out all" } }
+        }
+      },
+      "/sources": {
+        get: {
+          tags: ["Identity Service"],
+          summary: "List traffic/candidate sources",
+          security: [{ bearerAuth: [] }],
+          responses: { "200": { description: "Sources list" } }
+        },
+        post: {
+          tags: ["Identity Service"],
+          summary: "Create new traffic source",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["code", "name"],
+                  properties: {
+                    code: { type: "string", example: "LINKEDIN" },
+                    name: { type: "string", example: "LinkedIn Ads" }
+                  }
+                }
+              }
+            }
+          },
+          responses: { "201": { description: "Source created" } }
+        },
+        put: {
+          tags: ["Identity Service"],
+          summary: "Update/Rename traffic source",
+          security: [{ bearerAuth: [] }],
+          parameters: [{ in: "path", name: "oldCode", required: true, schema: { type: "string" } }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["code", "name"],
+                  properties: {
+                    code: { type: "string", example: "LINKEDIN_NEW" },
+                    name: { type: "string", example: "LinkedIn Professional" }
+                  }
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Source updated" } }
+        }
+      },
+      "/sources/{code}": {
+        delete: {
+          tags: ["Identity Service"],
+          summary: "Delete source",
+          security: [{ bearerAuth: [] }],
+          parameters: [{ in: "path", name: "code", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Deleted" } }
         }
       },
       "/public/jobs/{publicId}": {
@@ -423,9 +430,67 @@ const swaggerOptions: swaggerJsdoc.Options = {
         },
         post: {
           tags: ["Applicant Service"],
-          summary: "Create applicant",
+          summary: "Create applicant manually",
           security: [{ bearerAuth: [] }],
           responses: { "201": { description: "Created" } }
+        }
+      },
+      "/applicants/analyze": {
+        post: {
+          tags: ["Applicant Service"],
+          summary: "AI Resume Analysis (Multipart)",
+          description: "Upload a PDF resume to extract structured data (contact, education, skills, experience) using Gemini AI.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["resume"],
+                  properties: {
+                    resume: { type: "string", format: "binary" }
+                  }
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Extracted information JSON" } }
+        }
+      },
+      "/applicants/apply": {
+        post: {
+          tags: ["Applicant Service"],
+          summary: "Submit application (JSON)",
+          description: "Post-analysis or manual application submission with full candidate details.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["firstName", "lastName", "email", "jobId"],
+                  properties: {
+                    firstName: { type: "string" },
+                    lastName: { type: "string" },
+                    email: { type: "string" },
+                    jobId: { type: "string" }
+                  }
+                }
+              }
+            }
+          },
+          responses: { "201": { description: "Application submitted" } }
+        }
+      },
+      "/applicants/verify/{applicantId}": {
+        post: {
+          tags: ["Applicant Service"],
+          summary: "Verify applicant credentials",
+          security: [{ bearerAuth: [] }],
+          parameters: [{ in: "path", name: "applicantId", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Verified" } }
         }
       },
       "/applicants/{jobId}": {

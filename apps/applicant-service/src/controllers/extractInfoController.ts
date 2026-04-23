@@ -5,7 +5,7 @@ import { AppError, ok } from "@umurava/shared-utils";
 import { env } from "../config/env";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const GEMINI_MODEL = "gemini-1.5-flash"; // Fallback to a stable version if 2.5 is not available
+const GEMINI_MODEL = process.env.GEMINI_API_KEY || "gemini-2.5-flash-lite";
 
 const SCHEMA_TEMPLATE = {
   "source": "upload",

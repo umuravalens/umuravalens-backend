@@ -44,6 +44,10 @@ router.post("/jobs/:id/publish", authenticate, proxyToJobs);
 router.patch("/jobs/:id", authenticate, proxyToJobs);
 router.delete("/jobs/:id", authenticate, proxyToJobs);
 
+router.post("/applicants/analyze", authenticate, upload.single("resume"), proxyToApplicants);
+router.post("/applicants/apply", authenticate, proxyToApplicants);
+router.post("/applicants/verify/:applicantId", authenticate, proxyToApplicants);
+
 router.post("/applicants", authenticate, proxyToApplicants);
 router.get("/applicants", authenticate, proxyToApplicants);
 router.get("/applicants/:jobId", authenticate, proxyToApplicants);
