@@ -6,13 +6,15 @@ export interface ApplicantDocumentAttachment {
   storedFileName: string;
   uploadDate: Date;
   fileUrl: string;
+  isAdditional: boolean;
+  isVerified: boolean;
+  sendToAI: boolean;
 }
 
 export interface ApplicantProfileData {
   basicInfo: {
     firstName: string;
     lastName: string;
-    phoneNumber: string;
     headline: string;
     bio: string;
     location: string;
@@ -92,10 +94,10 @@ const applicantSchema = new Schema<ApplicantDocument>(
     jobId: { type: String, required: true, index: true },
     source: { type: String, enum: ["platform", "upload"], required: true },
     application_source: { type: String, required: true },
-    status: { 
-      type: String, 
-      enum: ["draft", "pending", "shortlisted", "rejected"], 
-      default: "draft" 
+    status: {
+      type: String,
+      enum: ["draft", "pending", "shortlisted", "rejected"],
+      default: "draft"
     },
     name: { type: String, required: true },
     email: { type: String, required: true },
@@ -104,7 +106,6 @@ const applicantSchema = new Schema<ApplicantDocument>(
       basicInfo: {
         firstName: String,
         lastName: String,
-        phoneNumber: String,
         headline: String,
         bio: String,
         location: String
@@ -162,7 +163,10 @@ const applicantSchema = new Schema<ApplicantDocument>(
         originalFileName: { type: String, required: true },
         storedFileName: { type: String, required: true },
         uploadDate: { type: Date, default: Date.now },
-        fileUrl: { type: String, required: true }
+        fileUrl: { type: String, required: true },
+        isAdditional: { type: Boolean, default: false },
+        isVerified: { type: Boolean, default: false },
+        sendToAI: { type: Boolean, default: false }
       }
     ],
     aiAnalysis: {

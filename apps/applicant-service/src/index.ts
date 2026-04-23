@@ -3,7 +3,7 @@ import express from "express";
 import morgan from "morgan";
 import fs from "fs";
 import path from "path";
-import { logger, ok } from "@umurava/shared-utils";
+import { logger, ok, getUnderstandableMessage } from "@umurava/shared-utils";
 import { connectDb } from "./config/db";
 import { env } from "./config/env";
 import { errorHandler, notFound } from "./middlewares/error";
@@ -32,6 +32,6 @@ connectDb(env.mongodbUri)
     app.listen(env.port, () => logger.info({ message: `Applicant service running on port ${env.port}` }));
   })
   .catch((error) => {
-    logger.error({ message: "Failed to start applicant service", error });
+    logger.error({ message: getUnderstandableMessage(error), error });
     process.exit(1);
   });

@@ -9,7 +9,8 @@ import {
   listApplicantsByJobInternal,
   listApplicantsByJob,
   updateApplicant,
-  updateApplicantAIInternal
+  updateApplicantAIInternal,
+  verifyDocument
 } from "../controllers/applicantController";
 import { extractInfo } from "../controllers/extractInfoController";
 import { upload } from "../utils/upload";
@@ -27,5 +28,6 @@ router.get("/applicants", listApplicants);
 router.get("/applicants/:jobId", listApplicantsByJob);
 router.get("/applicant-items/:id", getApplicantById);
 router.patch("/applicant-items/:id", updateApplicant);
+router.patch("/applicant-items/:id/documents/:storedFileName/verify", verifyDocument);
 router.delete("/applicant-items/:id", deleteApplicant);
 export default router;

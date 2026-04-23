@@ -17,7 +17,6 @@ const SCHEMA_TEMPLATE = {
     "basicInfo": {
       "firstName": "string",
       "lastName": "string",
-      "phoneNumber": "string",
       "headline": "string",
       "bio": "string",
       "location": "string"
@@ -155,8 +154,8 @@ export const extractInfo = async (req: Request, res: Response, next: NextFunctio
         RULES:
         1. "source" MUST be "upload".
         2. "status" MUST be "pending".
-        3. Extract "name", "email", "phone" and return the phone number with the country code (ex: +250788888888 for rwandan numbers) from the resume.
-        4. In "profileData.basicInfo", break "name" into "firstName" and "lastName", and set "phoneNumber".
+        3. Extract "name", "email", and "phoneNumber" and return the phone number with the country code (ex: +250788888888 for rwandan numbers) from the resume.
+        4. In "profileData.basicInfo", break "name" into "firstName" and "lastName".
         5. GENERATE a professional "headline" based on their experience if not explicitly stated (e.g. "Senior Fullstack Developer | Node.js & React expert").
         6. For "skills" get any skills mentioned in the resume, if their "yearsOfExperience" isn't explicitly stated for a skill, set it to 0. DO NOT estimate.
         7. If "availability" data (status, type, startDate) is not provided, leave the fields as empty strings "". Do NOT default to "Not Available" or guess any status.

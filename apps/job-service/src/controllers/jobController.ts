@@ -232,3 +232,31 @@ export const getJobInternalById = async (req: Request, res: Response, next: Next
     next(error);
   }
 };
+
+export const updateJobMetrics = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { action } = req.body; // "increment" | "decrement"
+
+    const inc = action === "increment" ? 1 : -1;
+    const job = await Job.findByIdAndUpdate(
+      id,
+      { $inc: { unverifiedFilesCount: inc } },
+      { new: true }
+    );
+
+    if (!job) {
+      throw new AppError("Job not found", 404);
+    }
+
+    // Ensure count doesn't go below zero
+    if (job.unverifiedFilesCount < 0) {
+        job.unverifiedFilesCount = 0;
+        await job.save();
+    }
+
+    res.json(ok(job));
+  } catch (error) {
+    next(error);
+  }
+};

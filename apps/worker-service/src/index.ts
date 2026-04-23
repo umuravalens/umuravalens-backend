@@ -26,5 +26,21 @@ await new Promise((resolve)=>setTimeout(resolve,2000));await Screening.findByIdA
     shortlistedCount: ranked.filter((r: any) => r.score >= 70).length // Threshold 70
   }
 });
-await emitEvent("screening_completed",{screeningId,jobId,totalRanked:ranked.length});logger.info({message:"Completed screening job",screeningId});},{connection});worker.on("failed",(failedJob,error)=>{logger.error({message:"Screening job failed",jobId:failedJob?.id,error:error.message});});logger.info({message:"Worker service is running"});};
+await emitEvent("screening_completed",{screeningId,jobId,totalRanked:ranked.length});logger.info({message:"Completed screening job",screeningId});},{connection});worker.on("failed",(failedJob,error)=>{logger.error({message:"Screening job failed",jobId:failedJob?.id,error:error.message});});  const metricsWorker = new Worker("job-metrics-queue", async (job) => {
+    const { jobId, action } = job.data as { jobId: string; action: "increment" | "decrement" };
+    logger.info({ message: "Processing job metrics update", jobId, action });
+    try {
+      await axios.patch(`${env.jobServiceUrl}/jobs/internal/${jobId}/metrics`, { action });
+    } catch (error: any) {
+      logger.error({ message: "Failed to update job metrics", jobId, error: error.message });
+      throw error;
+    }
+  }, { connection });
+
+  metricsWorker.on("failed", (failedJob, error) => {
+    logger.error({ message: "Job metrics update failed", jobId: failedJob?.id, error: error.message });
+  });
+
+  logger.info({ message: "Worker service is running" });
+};
 boot().catch((error)=>{logger.error({message:"Worker failed to start",error});process.exit(1);});
