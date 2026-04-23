@@ -3,6 +3,23 @@ import { ok, AppError } from "@umurava/shared-utils";
 import * as authService from "../services/authService";
 import { AuthenticatedRequest } from "../middlewares/auth";
 
+export const registerUser = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { firstname, lastname, email, password } = req.body;
+    if (!firstname || !lastname || !email || !password) {
+      throw new AppError("firstname, lastname, email and password are required", 400);
+    }
+    if (String(password).length < 6) {
+        throw new AppError("password must be at least 6 characters", 400);
+    }
+
+    const data = await authService.register({ firstname, lastname, email, password });
+    res.status(201).json(ok(data));
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const loginUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
@@ -108,6 +125,20 @@ export const me = async (req: AuthenticatedRequest, res: Response, next: NextFun
     }
 
     const data = await authService.getProfile(userId);
+    res.json(ok(data));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyEmail = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      throw new AppError("token is required", 400);
+    }
+
+    const data = await authService.verifyEmail(String(token));
     res.json(ok(data));
   } catch (error) {
     next(error);

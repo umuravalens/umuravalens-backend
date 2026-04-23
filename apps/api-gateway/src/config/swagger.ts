@@ -33,6 +33,33 @@ const swaggerOptions: swaggerJsdoc.Options = {
       }
     },
     paths: {
+      "/auth/register": {
+        post: {
+          tags: ["Identity Service"],
+          summary: "Register new recruiter",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["firstname", "lastname", "email", "password"],
+                  properties: {
+                    firstname: { type: "string" },
+                    lastname: { type: "string" },
+                    email: { type: "string" },
+                    password: { type: "string", minLength: 6 }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "201": { description: "User registered" },
+            "409": { description: "Email already in use" }
+          }
+        }
+      },
       "/auth/login": {
         post: {
           tags: ["Identity Service"],
@@ -117,6 +144,49 @@ const swaggerOptions: swaggerJsdoc.Options = {
             }
           },
           responses: { "200": { description: "Reset initiated" } }
+        }
+      },
+      "/auth/verify-email": {
+        post: {
+          tags: ["Identity Service"],
+          summary: "Verify email with token",
+          security: [],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["token"],
+                  properties: { token: { type: "string" } }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Email verified" },
+            "400": { description: "Invalid or expired token" }
+          }
+        }
+      },
+      "/auth/resend-verification": {
+        post: {
+          tags: ["Identity Service"],
+          summary: "Resend verification email",
+          security: [],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["email"],
+                  properties: { email: { type: "string", format: "email" } }
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Verification email sent" } }
         }
       },
       "/auth/reset-password": {

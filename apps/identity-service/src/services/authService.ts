@@ -28,6 +28,38 @@ const signRefreshToken = (userId: string, email: string, tokenVersion: number) =
     expiresIn: env.refreshTokenExpiry as any
   });
 
+export const register = async (payload: { firstname: string; lastname: string; email: string; password: string }) => {
+  const email = payload.email.toLowerCase().trim();
+  const existing = await User.findOne({ email });
+  if (existing) {
+    throw new AppError("A user with this email already exists", 409);
+  }
+
+  const passwordHash = await bcrypt.hash(payload.password, 10);
+  const verificationToken = randomToken();
+  const tokenHash = hashToken(verificationToken);
+
+  const user = new User({
+    firstname: payload.firstname.trim(),
+    lastname: payload.lastname.trim(),
+    email,
+    passwordHash,
+    role: "recruiter",
+    emailVerified: false,
+    emailVerificationTokenHash: tokenHash,
+    sources: [DEFAULT_SOURCE]
+  });
+
+  await user.save();
+  await sendVerificationEmail(user.email, `${user.firstname} ${user.lastname}`, verificationToken);
+
+  return { 
+    id: user.id, 
+    email: user.email, 
+    message: "Registration successful. Please verify your email." 
+  };
+};
+
 export const login = async (email: string, password: string) => {
   const user = await User.findOne({ email });
   if (!user) {
@@ -194,6 +226,21 @@ export const getProfile = async (userId: string) => {
     sources: user.sources,
     createdAt: user.createdAt
   };
+};
+
+export const verifyEmail = async (token: string) => {
+  const tokenHash = hashToken(token);
+  const user = await User.findOne({ emailVerificationTokenHash: tokenHash });
+
+  if (!user) {
+    throw new AppError("Invalid or expired verification token", 400);
+  }
+
+  user.emailVerified = true;
+  user.emailVerificationTokenHash = undefined;
+  await user.save();
+
+  return { verified: true, email: user.email };
 };
 
 export const resendVerification = async (email: string) => {

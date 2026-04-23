@@ -10,11 +10,9 @@ import { authenticate } from "../middlewares/auth";
 const router = Router();
 
 // All source routes require authentication
-router.use(authenticate);
-
-router.get("/sources", getSources);
-router.post("/sources", createSource);
-router.put("/sources/:oldCode", updateSource);
-router.delete("/sources/:code", deleteSource);
+router.get("/sources", authenticate, getSources);
+router.post("/sources", authenticate, createSource);
+router.put("/sources/:oldCode", authenticate, updateSource);
+router.delete("/sources/:code", authenticate, deleteSource);
 
 export default router;
