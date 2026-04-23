@@ -12,7 +12,7 @@ import {
 
 const router = Router();
 
-router.get("/jobs/public/:publicId", getPublicJobByPublicId);
+router.get("/jobs/public/:publicId/:sourceCode?", getPublicJobByPublicId);
 router.get("/jobs/internal/:id", getJobInternalById);
 router.post("/jobs", createJob);
 router.get("/jobs", listJobs);

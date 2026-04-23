@@ -16,5 +16,7 @@ export const env = {
   smtpPass: process.env.SMTP_PASS || "",
   smtpSecure: process.env.SMTP_SECURE === "true",
   emailFrom: process.env.EMAIL_FROM || process.env.SMTP_USER || "no-reply@umurava.local",
-  googleClientId: process.env.GOOGLE_CLIENT_ID || ""
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  defaultSourceName: process.env.DEFAULT_SOURCE_NAME || "Umurava",
+  defaultSourceCode: process.env.DEFAULT_SOURCE_CODE || "umrv_plt"
 };

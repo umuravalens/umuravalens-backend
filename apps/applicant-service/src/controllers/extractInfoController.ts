@@ -4,18 +4,20 @@ import fs from "fs";
 import { AppError, ok } from "@umurava/shared-utils";
 import { env } from "../config/env";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const GEMINI_MODEL = process.env.GEMINI_API_KEY || "gemini-2.5-flash-lite";
+const genAI = new GoogleGenerativeAI(env.geminiApiKey);
+const GEMINI_MODEL = env.geminiModel;
 
 const SCHEMA_TEMPLATE = {
   "source": "upload",
   "status": "pending",
   "name": "string",
   "email": "string",
+  "phoneNumber": "string",
   "profileData": {
     "basicInfo": {
       "firstName": "string",
       "lastName": "string",
+      "phoneNumber": "string",
       "headline": "string",
       "bio": "string",
       "location": "string"
@@ -153,8 +155,8 @@ export const extractInfo = async (req: Request, res: Response, next: NextFunctio
         RULES:
         1. "source" MUST be "upload".
         2. "status" MUST be "pending".
-        3. Extract "name", "email" from the resume headlines.
-        4. In "profileData.basicInfo", break "name" into "firstName" and "lastName".
+        3. Extract "name", "email", "phone" and return the phone number with the country code (ex: +250788888888 for rwandan numbers) from the resume.
+        4. In "profileData.basicInfo", break "name" into "firstName" and "lastName", and set "phoneNumber".
         5. GENERATE a professional "headline" based on their experience if not explicitly stated (e.g. "Senior Fullstack Developer | Node.js & React expert").
         6. For "skills" get any skills mentioned in the resume, if their "yearsOfExperience" isn't explicitly stated for a skill, set it to 0. DO NOT estimate.
         7. If "availability" data (status, type, startDate) is not provided, leave the fields as empty strings "". Do NOT default to "Not Available" or guess any status.

@@ -2,8 +2,9 @@ import { Response, NextFunction } from "express";
 import { User } from "../models/User";
 import { AppError, ok } from "@umurava/shared-utils";
 import { AuthenticatedRequest } from "../middlewares/auth";
+import { env } from "../config/env";
 
-const DEFAULT_SOURCE = { name: "Umurava", code: "umrv_plt" };
+const DEFAULT_SOURCE = { name: env.defaultSourceName, code: env.defaultSourceCode, deletable: false };
 
 export const getSources = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -55,7 +56,7 @@ export const createSource = async (req: AuthenticatedRequest, res: Response, nex
       throw new AppError("Source with this code already exists", 400);
     }
 
-    user.sources.push({ name, code });
+    user.sources.push({ name, code, deletable: true });
     await user.save();
 
     res.status(201).json(ok(user.sources));
@@ -86,7 +87,8 @@ export const updateSource = async (req: AuthenticatedRequest, res: Response, nex
       throw new AppError("Source not found", 404);
     }
 
-    user.sources[sourceIndex] = { name, code };
+    const currentSource = user.sources[sourceIndex];
+    user.sources[sourceIndex] = { name, code, deletable: currentSource.deletable };
     await user.save();
 
     res.json(ok(user.sources));
@@ -102,13 +104,18 @@ export const deleteSource = async (req: AuthenticatedRequest, res: Response, nex
 
     const { code } = req.params;
 
-    if (code === DEFAULT_SOURCE.code) {
-      throw new AppError("Cannot delete the default source", 400);
-    }
-
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError("User not found", 404);
+    }
+
+    const source = user.sources.find(s => s.code === code);
+    if (!source) {
+      throw new AppError("Source not found", 404);
+    }
+
+    if (source.deletable === false) {
+      throw new AppError("Cannot delete this protected source", 400);
     }
 
     user.sources = user.sources.filter(s => s.code !== code);

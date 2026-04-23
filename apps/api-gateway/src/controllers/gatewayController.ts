@@ -69,7 +69,14 @@ export const proxyToScreenings = (req: Request, res: Response, next: NextFunctio
 
 export const getPublicJobDetails = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const response = await axios.get(`${env.jobServiceUrl}/jobs/public/${req.params.publicId}`);
+    const { publicId, sourceCode } = req.params;
+    
+    // Construct internal path, including sourceCode if present
+    const path = sourceCode 
+      ? `/jobs/public/${publicId}/${sourceCode}`
+      : `/jobs/public/${publicId}`;
+
+    const response = await axios.get(`${env.jobServiceUrl}${path}`);
     res.status(response.status).json(response.data);
   } catch (error) {
     if (!forwardAxiosError(res, error)) {

@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError, ok } from "@umurava/shared-utils";
 import { Job } from "../models/Job";
+import { env } from "../config/env";
 
 const getUserId = (req: Request): string => {
   const userId = String(req.headers["x-user-id"] || "");
@@ -64,13 +65,19 @@ export const createJob = async (req: Request, res: Response, next: NextFunction)
 
     const normalizedRequirements = validateRequirements(requirements);
 
+    const jobSources = Array.isArray(sources) ? sources : [];
+    const hasDefault = jobSources.some(s => s.code === env.defaultSourceCode);
+    if (!hasDefault) {
+      jobSources.push({ name: env.defaultSourceName, code: env.defaultSourceCode, applicantCount: 0 });
+    }
+
     const job = await Job.create({
       recruiterId,
       title,
       description,
-      sources: Array.isArray(sources) ? sources : [],
+      sources: jobSources,
       requirements: normalizedRequirements,
-      status: status || "open",
+      status: status || "draft",
       threshold: Number(threshold) || 0,
       shortlist: Number(shortlist) || 0,
       requiredDocuments: Array.isArray(requiredDocuments) ? requiredDocuments : []
@@ -131,6 +138,13 @@ export const updateJob = async (req: Request, res: Response, next: NextFunction)
       payload.requirements = validateRequirements(payload.requirements);
     }
 
+    if (payload.sources && Array.isArray(payload.sources)) {
+      const hasDefault = payload.sources.some((s: any) => s.code === env.defaultSourceCode);
+      if (!hasDefault) {
+        payload.sources.push({ name: env.defaultSourceName, code: env.defaultSourceCode, applicantCount: 0 });
+      }
+    }
+
     const job = await Job.findOneAndUpdate({ _id: req.params.id, recruiterId }, payload, {
       new: true,
       runValidators: true
@@ -162,7 +176,7 @@ export const publishJob = async (req: Request, res: Response, next: NextFunction
     const recruiterId = getUserId(req);
     const job = await Job.findOneAndUpdate(
       { _id: req.params.id, recruiterId },
-      { status: "open" },
+      { status: "published" },
       { new: true, runValidators: true }
     );
     if (!job) {
@@ -176,9 +190,17 @@ export const publishJob = async (req: Request, res: Response, next: NextFunction
 
 export const getPublicJobByPublicId = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const job = await Job.findOne({ publicId: req.params.publicId, status: "published" });
+    const { publicId, sourceCode } = req.params;
+    const effectiveSource = sourceCode || env.defaultSourceCode;
+
+    const job = await Job.findOne({ publicId, status: "published" });
     if (!job) {
       throw new AppError("Public job not found", 404);
+    }
+
+    const hasSource = job.sources.some(s => s.code === String(effectiveSource));
+    if (!hasSource) {
+      throw new AppError("This job is not available for the specified source", 403);
     }
 
     res.json(
@@ -190,7 +212,8 @@ export const getPublicJobByPublicId = async (req: Request, res: Response, next: 
         description: job.description,
         requirements: job.requirements,
         status: job.status,
-        requiredDocuments: job.requiredDocuments
+        requiredDocuments: job.requiredDocuments,
+        activeSource: effectiveSource
       })
     );
   } catch (error) {

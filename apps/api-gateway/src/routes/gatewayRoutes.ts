@@ -13,13 +13,43 @@ import {
 import { authenticate } from "../middlewares/auth";
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = [
+      // Documents
+      "application/pdf",
+      "application/msword", // .doc
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+      "application/vnd.ms-excel", // .xls
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+      "application/vnd.ms-powerpoint", // .ppt
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+      "text/plain", // .txt
+
+      // Images
+      "image/png",
+      "image/jpeg", // Covers .jpg and .jpeg
+      "image/gif",
+      "image/webp",
+      "image/svg+xml",
+      "image/bmp"
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Only PDF, DOCX, PNG, and JPG are allowed."));
+    }
+  }
+});
 
 router.use("/uploads", proxyApplicantUploads);
 
 /** No `authenticate` middleware — candidates and anonymous browsers must access these without JWT. */
-router.get("/public/jobs/:publicId", getPublicJobDetails);
-router.post("/public/jobs/:publicId/apply", upload.array("files", 20), submitPublicApplication);
+router.get("/jobs/public/:publicId/:sourceCode?", getPublicJobDetails);
+router.post("/applicants/analyze", upload.single("resume"), proxyToApplicants);
+router.post("/applicants/apply", upload.array("files", 10), proxyToApplicants);
+router.post("/applicants/verify/:applicantId", upload.array("files", 10), proxyToApplicants);
 
 router.post("/identity/login", proxyToIdentity);
 router.post("/identity/google", proxyToIdentity);
@@ -43,10 +73,6 @@ router.post("/jobs", authenticate, proxyToJobs);
 router.post("/jobs/:id/publish", authenticate, proxyToJobs);
 router.patch("/jobs/:id", authenticate, proxyToJobs);
 router.delete("/jobs/:id", authenticate, proxyToJobs);
-
-router.post("/applicants/analyze", authenticate, upload.single("resume"), proxyToApplicants);
-router.post("/applicants/apply", authenticate, proxyToApplicants);
-router.post("/applicants/verify/:applicantId", authenticate, proxyToApplicants);
 
 router.post("/applicants", authenticate, proxyToApplicants);
 router.get("/applicants", authenticate, proxyToApplicants);
