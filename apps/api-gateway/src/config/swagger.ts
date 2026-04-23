@@ -92,11 +92,10 @@ const swaggerOptions: swaggerJsdoc.Options = {
               type: "object",
               properties: {
                 skills: { type: "array", items: { type: "string" }, example: ["Node.js", "TypeScript"] },
-                experience: { type: "number", example: 5 }
+                experienceYears: { type: "number", example: 5 },
+                location: { type: "string", example: "Kigali, Rwanda" }
               }
             },
-            location: { type: "string", example: "Kigali, Rwanda" },
-            employmentType: { type: "string", example: "Full-time" },
             shortlist: { type: "number", example: 75 },
             createdAt: { type: "string", format: "date-time" }
           }
@@ -974,17 +973,27 @@ const swaggerOptions: swaggerJsdoc.Options = {
                         }
                       }
                     },
-                    department: { type: "string", example: "Engineering" },
                     requirements: {
                       type: "object",
-                      required: ["skills", "experience"],
+                      required: ["skills", "experienceYears", "location"],
                       properties: {
                         skills: { type: "array", items: { type: "string" }, minItems: 1 },
-                        experience: { type: "number", minimum: 0 }
+                        experienceYears: { type: "number", minimum: 0 },
+                        location: { type: "string", example: "Kigali, Rwanda" }
                       }
                     },
-                    location: { type: "string" },
-                    employmentType: { type: "string" },
+                    shortlist: { type: "number", example: 70 },
+                    requiredDocuments: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          documentType: { type: "string", example: "Portfolio" },
+                          isRequired: { type: "boolean", example: true },
+                          sendToAI: { type: "boolean", example: true }
+                        }
+                      }
+                    },
                     status: { type: "string", enum: ["draft", "published", "closed", "archived"] }
                   }
                 }
