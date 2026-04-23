@@ -13,6 +13,7 @@ const SCHEMA_TEMPLATE = {
   "name": "string",
   "email": "string",
   "phoneNumber": "string",
+  "dateOfBirth": "YYYY-MM-DD",
   "profileData": {
     "basicInfo": {
       "firstName": "string",

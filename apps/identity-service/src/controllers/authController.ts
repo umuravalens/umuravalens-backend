@@ -200,3 +200,13 @@ export const changePassword = async (req: AuthenticatedRequest, res: Response, n
     next(error);
   }
 };
+
+export const getUserInternal = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const data = await authService.getProfile(id);
+    res.json(ok(data));
+  } catch (error) {
+    next(error);
+  }
+};

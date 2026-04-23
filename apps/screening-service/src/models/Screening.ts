@@ -4,7 +4,11 @@ import { ScreeningStatus } from "@umurava/shared-types";
 export interface ScreeningDocument {
   jobId: string;
   recruiterId: string;
-  status: "pending" | "processing" | "completed" | "failed";
+  status: "pending" | "processing" | "completed" | "failed" | "stopped";
+  progress: {
+    finished: number;
+    total: number;
+  };
   stats: {
     totalApplicants: number;
     shortlistedCount: number;
@@ -21,8 +25,12 @@ const screeningSchema = new Schema<ScreeningDocument>(
     recruiterId: { type: String, required: true, index: true },
     status: { 
       type: String, 
-      enum: ["pending", "processing", "completed", "failed"], 
+      enum: ["pending", "processing", "completed", "failed", "stopped"], 
       default: "pending" 
+    },
+    progress: {
+      finished: { type: Number, default: 0 },
+      total: { type: Number, default: 0 }
     },
     stats: {
       totalApplicants: { type: Number, default: 0 },
