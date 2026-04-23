@@ -56,7 +56,7 @@ const handle = async (req: Request, res: Response, next: NextFunction, base: str
 };
 
 export const proxyToIdentity = (req: Request, res: Response, next: NextFunction) =>
-  handle(req, res, next, env.identityServiceUrl, req.path.replace(/^\/identity/, "") || "/");
+  handle(req, res, next, env.identityServiceUrl, req.path.replace(/^\/(identity|auth)/, "") || "/");
 
 export const proxyToJobs = (req: Request, res: Response, next: NextFunction) =>
   handle(req, res, next, env.jobServiceUrl, req.path);

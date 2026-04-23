@@ -48,15 +48,15 @@ const validateRequirements = (requirements: any) => {
 export const createJob = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getUserId(req);
-    const { 
-      title, 
-      description, 
-      sources, 
-      requirements, 
-      status, 
-      threshold, 
-      shortlist, 
-      requiredDocuments 
+    const {
+      title,
+      description,
+      sources,
+      requirements,
+      status,
+      threshold,
+      shortlist,
+      requiredDocuments
     } = req.body;
 
     if (!title || !description) {
