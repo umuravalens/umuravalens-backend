@@ -12,6 +12,7 @@ export interface ApplicantProfileData {
   basicInfo: {
     firstName: string;
     lastName: string;
+    phoneNumber: string;
     headline: string;
     bio: string;
     location: string;
@@ -70,6 +71,7 @@ export interface ApplicantDocument {
   status: "draft" | "pending" | "shortlisted" | "rejected";
   name: string;
   email: string;
+  phoneNumber: string;
   profileData: ApplicantProfileData;
   resumeUrl: string;
   documents: ApplicantDocumentAttachment[];
@@ -97,10 +99,12 @@ const applicantSchema = new Schema<ApplicantDocument>(
     },
     name: { type: String, required: true },
     email: { type: String, required: true },
+    phoneNumber: { type: String },
     profileData: {
       basicInfo: {
         firstName: String,
         lastName: String,
+        phoneNumber: String,
         headline: String,
         bio: String,
         location: String

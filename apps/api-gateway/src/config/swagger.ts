@@ -144,13 +144,13 @@ const swaggerOptions: swaggerJsdoc.Options = {
       },
       "/auth/me": {
         get: {
-          tags: ["Auth Service"],
+          tags: ["Identity Service"],
           summary: "Get profile",
           security: [{ bearerAuth: [] }],
           responses: { "200": { description: "Profile" } }
         },
         patch: {
-          tags: ["Auth Service"],
+          tags: ["Identity Service"],
           summary: "Update profile details",
           security: [{ bearerAuth: [] }],
           requestBody: {
@@ -173,7 +173,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
       },
       "/auth/change-password": {
         patch: {
-          tags: ["Auth Service"],
+          tags: ["Identity Service"],
           summary: "Change password for authenticated user",
           security: [{ bearerAuth: [] }],
           requestBody: {
@@ -196,7 +196,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
       },
       "/auth/logout": {
         post: {
-          tags: ["Auth Service"],
+          tags: ["Identity Service"],
           summary: "Logout current session",
           security: [{ bearerAuth: [] }],
           responses: { "200": { description: "Logged out" } }
@@ -270,60 +270,17 @@ const swaggerOptions: swaggerJsdoc.Options = {
           responses: { "200": { description: "Deleted" } }
         }
       },
-      "/public/jobs/{publicId}": {
+      "/jobs/public/{publicId}/{sourceCode}": {
         get: {
           tags: ["Job Service"],
-          summary: "Get public job details by shareable URL id",
+          summary: "Get public job details (Anonymous)",
           security: [],
-          description:
-            "Returns only jobs with status **published**. Draft or unpublished jobs respond with **404** (same as unknown id).",
-          parameters: [{ in: "path", name: "publicId", required: true, schema: { type: "string" } }],
-          responses: {
-            "200": { description: "Public job details" },
-            "404": { description: "Not found or job is not published" }
-          }
-        }
-      },
-      "/public/jobs/{publicId}/apply": {
-        post: {
-          tags: ["Applicant Service"],
-          summary: "Apply to a public job (multipart — only public apply endpoint)",
-          security: [],
-          description:
-            "Single request: text fields plus optional files. Repeat field `files` for each binary. `documentNames` is a JSON string array with one label per file in order, or `[]` if no files. `skills` as comma-separated text. Authenticated applicant list/detail responses include `documents[].fileUrl` (path under this gateway) for viewing in the browser.",
-          parameters: [{ in: "path", name: "publicId", required: true, schema: { type: "string" } }],
-          requestBody: {
-            required: true,
-            content: {
-              "multipart/form-data": {
-                schema: {
-                  type: "object",
-                  required: ["firstName", "lastName", "email", "phoneNumber", "skills", "experienceYears"],
-                  properties: {
-                    firstName: { type: "string" },
-                    lastName: { type: "string" },
-                    email: { type: "string", format: "email" },
-                    phoneNumber: { type: "string" },
-                    skills: { type: "string", description: "Comma-separated skills", example: "Node.js,MongoDB" },
-                    experienceYears: { type: "string", description: "Number as text", example: "3" },
-                    resumeUrl: { type: "string", description: "Optional external link" },
-                    documentNames: {
-                      type: "string",
-                      description: 'JSON array of labels, same order as files, e.g. ["Resume","Certificate"]',
-                      example: '["Resume","Cover letter"]'
-                    },
-                    files: { type: "array", items: { type: "string", format: "binary" }, description: "Repeat field name `files` for each upload" }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            "201": {
-              description:
-                "Created. `data.documents[]` includes `fileUrl` (e.g. `/uploads/...`) for the gateway; use `GET` on that path to open the file."
-            }
-          }
+          description: "Fetches job title and description. If sourceCode is omitted, it defaults to the platform default.",
+          parameters: [
+            { in: "path", name: "publicId", required: true, schema: { type: "string" } },
+            { in: "path", name: "sourceCode", required: false, schema: { type: "string" }, description: "Optional source tracker. Defaults to platform root if empty." }
+          ],
+          responses: { "200": { description: "Public Job Details" }, "403": { description: "Invalid source" } }
         }
       },
       "/uploads/{filename}": {
@@ -343,7 +300,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
           summary: "List recruiter jobs",
           security: [{ bearerAuth: [] }],
           parameters: [
-            { in: "query", name: "status", schema: { type: "string", enum: ["draft", "published", "closed"] } },
+            { in: "query", name: "status", schema: { type: "string", enum: ["draft", "published", "closed", "archived"] } },
             { in: "query", name: "page", schema: { type: "integer", minimum: 1, default: 1 } },
             { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
           ],
@@ -363,6 +320,16 @@ const swaggerOptions: swaggerJsdoc.Options = {
                   properties: {
                     title: { type: "string" },
                     description: { type: "string" },
+                    sources: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          name: { type: "string" },
+                          code: { type: "string" }
+                        }
+                      }
+                    },
                     department: { type: "string", example: "Engineering" },
                     requirements: {
                       type: "object",
@@ -374,7 +341,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
                     },
                     location: { type: "string" },
                     employmentType: { type: "string" },
-                    status: { type: "string", enum: ["draft", "published", "closed"] }
+                    status: { type: "string", enum: ["draft", "published", "closed", "archived"] }
                   }
                 }
               }
@@ -416,6 +383,162 @@ const swaggerOptions: swaggerJsdoc.Options = {
           responses: { "200": { description: "Published; includes publicUrl" } }
         }
       },
+      "/applicants/analyze": {
+        post: {
+          tags: ["Applicant Service"],
+          summary: "AI Resume Analysis (Public)",
+          description: "Upload a PDF resume to extract structured data using Gemini AI. No authentication required.",
+          security: [],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["resume"],
+                  properties: { resume: { type: "string", format: "binary" } }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "AI extraction results with full profile layout",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      extracted_info: {
+                        type: "object",
+                        properties: {
+                          name: { type: "string" },
+                          email: { type: "string" },
+                          phoneNumber: { type: "string" },
+                          profileData: {
+                            type: "object",
+                            properties: {
+                              basicInfo: {
+                                type: "object",
+                                properties: {
+                                  firstName: { type: "string" },
+                                  lastName: { type: "string" },
+                                  phoneNumber: { type: "string" },
+                                  headline: { type: "string" },
+                                  bio: { type: "string" },
+                                  location: { type: "string" }
+                                }
+                              },
+                              skills: { type: "array", items: { type: "object", properties: { name: { type: "string" }, level: { type: "string" }, yearsOfExperience: { type: "number" } } } },
+                              languages: { type: "array", items: { type: "object", properties: { name: { type: "string" }, proficiency: { type: "string" } } } },
+                              experience: { type: "array", items: { type: "object", properties: { company: { type: "string" }, role: { type: "string" }, startDate: { type: "string" }, endDate: { type: "string" }, description: { type: "string" }, technologies: { type: "array", items: { type: "string" } }, isCurrent: { type: "boolean" } } } },
+                              education: { type: "array", items: { type: "object", properties: { institution: { type: "string" }, degree: { type: "string" }, fieldOfStudy: { type: "string" }, startYear: { type: "number" }, endYear: { type: "number" } } } },
+                              certifications: { type: "array", items: { type: "object", properties: { name: { type: "string" }, issuer: { type: "string" }, issueDate: { type: "string" } } } },
+                              projects: { type: "array", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, technologies: { type: "array", items: { type: "string" } }, role: { type: "string" }, link: { type: "string" }, startDate: { type: "string" }, endDate: { type: "string" } } } },
+                              availability: { type: "object", properties: { status: { type: "string" }, type: { type: "string" }, startDate: { type: "string" } } },
+                              socialLinks: { type: "object", additionalProperties: { type: "string" } }
+                            }
+                          }
+                        }
+                      },
+                      missingFields: { type: "object", description: "Report of fields the AI couldn't find" },
+                      tempFile: { type: "object", properties: { filename: { type: "string" }, path: { type: "string" }, originalName: { type: "string" } } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/applicants/apply": {
+        post: {
+          tags: ["Applicant Service"],
+          summary: "Submit application (Public)",
+          description: "Post-analysis or manual application submission. No authentication required.",
+          security: [],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["verifiedData", "jobId", "source_code"],
+                  properties: {
+                    verifiedData: { 
+                      type: "string", 
+                      description: "JSON string of candidate info (follows same structure as Analyze response)" 
+                    },
+                    jobId: { type: "string" },
+                    source_code: { type: "string" },
+                    otherDocuments: { type: "string", description: "JSON string of existing doc links" },
+                    files: { type: "array", items: { type: "string", format: "binary" }, description: "Additional documents/images" }
+                  }
+                }
+              }
+            }
+          },
+          responses: { 
+            "201": { 
+              description: "Application submitted (Status: draft)",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      applicantId: { type: "string" },
+                      status: { type: "string", example: "draft" },
+                      name: { type: "string" },
+                      email: { type: "string" },
+                      phoneNumber: { type: "string" },
+                      profileData: { type: "object" }
+                    }
+                  }
+                }
+              }
+            } 
+          }
+        }
+      },
+      "/applicants/verify/{applicantId}": {
+        post: {
+          tags: ["Applicant Service"],
+          summary: "Verify applicant credentials (Public)",
+          security: [],
+          parameters: [{ in: "path", name: "applicantId", required: true, schema: { type: "string" } }],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    profileData: { type: "string", description: "JSON string of updated profile info" },
+                    files: { type: "array", items: { type: "string", format: "binary" }, description: "Additional docs during verification" }
+                  }
+                }
+              }
+            }
+          },
+          responses: { 
+            "200": { 
+              description: "Verified application (Promoted to 'pending' if no changes detected)",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      applicantId: { type: "string" },
+                      status: { type: "string", example: "pending" },
+                      profileData: { type: "object" }
+                    }
+                  }
+                }
+              }
+            } 
+          }
+        }
+      },
       "/applicants": {
         get: {
           tags: ["Applicant Service"],
@@ -433,64 +556,6 @@ const swaggerOptions: swaggerJsdoc.Options = {
           summary: "Create applicant manually",
           security: [{ bearerAuth: [] }],
           responses: { "201": { description: "Created" } }
-        }
-      },
-      "/applicants/analyze": {
-        post: {
-          tags: ["Applicant Service"],
-          summary: "AI Resume Analysis (Multipart)",
-          description: "Upload a PDF resume to extract structured data (contact, education, skills, experience) using Gemini AI.",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "multipart/form-data": {
-                schema: {
-                  type: "object",
-                  required: ["resume"],
-                  properties: {
-                    resume: { type: "string", format: "binary" }
-                  }
-                }
-              }
-            }
-          },
-          responses: { "200": { description: "Extracted information JSON" } }
-        }
-      },
-      "/applicants/apply": {
-        post: {
-          tags: ["Applicant Service"],
-          summary: "Submit application (JSON)",
-          description: "Post-analysis or manual application submission with full candidate details.",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["firstName", "lastName", "email", "jobId"],
-                  properties: {
-                    firstName: { type: "string" },
-                    lastName: { type: "string" },
-                    email: { type: "string" },
-                    jobId: { type: "string" }
-                  }
-                }
-              }
-            }
-          },
-          responses: { "201": { description: "Application submitted" } }
-        }
-      },
-      "/applicants/verify/{applicantId}": {
-        post: {
-          tags: ["Applicant Service"],
-          summary: "Verify applicant credentials",
-          security: [{ bearerAuth: [] }],
-          parameters: [{ in: "path", name: "applicantId", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Verified" } }
         }
       },
       "/applicants/{jobId}": {

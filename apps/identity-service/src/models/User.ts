@@ -3,6 +3,7 @@ import { Schema, model } from "mongoose";
 export interface UserSource {
   name: string;
   code: string;
+  deletable: boolean;
 }
 
 export interface UserDocument {
@@ -29,7 +30,8 @@ const userSchema = new Schema<UserDocument>(
     sources: [
       {
         name: { type: String, required: true },
-        code: { type: String, required: true }
+        code: { type: String, required: true },
+        deletable: { type: Boolean, required: true, default: true }
       }
     ],
     googleId: { type: String, index: true },

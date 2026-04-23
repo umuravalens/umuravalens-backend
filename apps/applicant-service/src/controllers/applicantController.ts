@@ -84,15 +84,16 @@ const getPagination = (req: Request) => {
 export const addApplicant = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getRecruiterId(req);
-    const { jobId, name, email, profileData, resumeUrl, application_source } = req.body;
-    if (!jobId || !name || !email || !profileData || !application_source) {
-      throw new AppError("jobId, name, email, profileData and application_source are required", 400);
+    const { jobId, name, email, phoneNumber, profileData, resumeUrl, application_source } = req.body;
+    if (!jobId || !name || !email || !phoneNumber || !profileData || !application_source) {
+      throw new AppError("jobId, name, email, phoneNumber, profileData and application_source are required", 400);
     }
 
     const applicant = await Applicant.create({
       jobId,
       name,
       email,
+      phoneNumber,
       profileData,
       application_source,
       resumeUrl,
@@ -109,7 +110,11 @@ export const addApplicant = async (req: Request, res: Response, next: NextFuncti
 
 export const applyApplicant = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { jobId, source_code, verifiedData, otherDocuments, resumeFile } = req.body;
+    const rawBody = req.body as Record<string, unknown>;
+    const verifiedData = typeof rawBody.verifiedData === 'string' ? JSON.parse(rawBody.verifiedData) : rawBody.verifiedData;
+    const jobId = rawBody.jobId as string;
+    const source_code = rawBody.source_code as string;
+    const otherDocsJson = typeof rawBody.otherDocuments === 'string' ? JSON.parse(rawBody.otherDocuments) : rawBody.otherDocuments;
 
     if (!jobId || !source_code || !verifiedData) {
       throw new AppError("jobId, source_code and verifiedData are required", 400);
@@ -130,9 +135,10 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
 
     // Document Validation
     const requiredDocs = job.requiredDocuments || [];
+    const uploadedFiles = (req.files as Express.Multer.File[]) || [];
     const providedDocNames = [
-        ...(otherDocuments || []).map((d: any) => d.documentName),
-        resumeFile?.documentName
+        ...(otherDocsJson || []).map((d: any) => d.documentName),
+        ...uploadedFiles.map(f => f.originalname.includes("Resume") ? "Resume" : "Other")
     ].filter(Boolean);
 
     for (const reqDoc of requiredDocs) {
@@ -149,18 +155,20 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
         }
     }
 
-    const docList: ApplicantDocumentAttachment[] = (otherDocuments || []).map((d: any) => ({
+    const docList: ApplicantDocumentAttachment[] = (otherDocsJson || []).map((d: any) => ({
         ...d,
         uploadDate: new Date(),
         fileUrl: `/uploads/${d.storedFileName}`
     }));
 
-    if (resumeFile) {
-        docList.push({
-            ...resumeFile,
-            uploadDate: new Date(),
-            fileUrl: `/uploads/${resumeFile.storedFileName}`
-        });
+    for (const file of uploadedFiles) {
+      docList.push({
+        documentName: file.originalname.includes("Resume") ? "Resume" : "Other",
+        originalFileName: file.originalname,
+        storedFileName: file.filename,
+        uploadDate: new Date(),
+        fileUrl: `/uploads/${file.filename}`
+      });
     }
 
     const resumeDoc = docList.find(d => d.documentName === 'Resume');
@@ -173,6 +181,7 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
       status: "draft",
       name: verifiedData.name,
       email: verifiedData.email,
+      phoneNumber: verifiedData.phoneNumber,
       profileData: verifiedData.profileData,
       resumeUrl: resumeUrl,
       documents: docList
@@ -187,7 +196,10 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
 export const verifyApplicant = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { applicantId } = req.params;
-        const updatedData = req.body;
+        const rawBody = req.body as Record<string, unknown>;
+        const updatedData = typeof rawBody.profileData === 'string' ? JSON.parse(rawBody.profileData) : rawBody;
+        // In verify, we might receive the whole object or just profileData. Handle both.
+        const profileData = updatedData.profileData || updatedData;
 
         const applicant = await Applicant.findById(applicantId);
         if (!applicant) {
@@ -205,9 +217,23 @@ export const verifyApplicant = async (req: Request, res: Response, next: NextFun
 
         if (isModified) {
             // Update the draft and return it
-            applicant.profileData = updatedData.profileData;
-            applicant.name = updatedData.name;
-            applicant.email = updatedData.email;
+            applicant.profileData = profileData;
+            if (updatedData.name) applicant.name = updatedData.name;
+            if (updatedData.email) applicant.email = updatedData.email;
+            if (updatedData.phoneNumber) applicant.phoneNumber = updatedData.phoneNumber;
+
+            // Handle new files in verify step
+            const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+            for (const file of uploadedFiles) {
+              applicant.documents.push({
+                documentName: file.originalname.includes("Resume") ? "Resume" : "Other",
+                originalFileName: file.originalname,
+                storedFileName: file.filename,
+                uploadDate: new Date(),
+                fileUrl: `/uploads/${file.filename}`
+              });
+            }
+
             await applicant.save();
             return res.json(ok(serializeApplicant(applicant)));
         }

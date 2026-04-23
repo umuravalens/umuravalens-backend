@@ -28,6 +28,8 @@ services:
       IDENTITY_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/identitydb?authSource=admin
       AUTH_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/identitydb?authSource=admin
       JWT_SECRET: ${JWT_SECRET}
+      DEFAULT_SOURCE_NAME: ${DEFAULT_SOURCE_NAME}
+      DEFAULT_SOURCE_CODE: ${DEFAULT_SOURCE_CODE}
     depends_on:
       - mongo
 
@@ -39,6 +41,8 @@ services:
     environment:
       JOB_SERVICE_PORT: ${JOB_SERVICE_PORT}
       JOB_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/jobdb?authSource=admin
+      DEFAULT_SOURCE_NAME: ${DEFAULT_SOURCE_NAME}
+      DEFAULT_SOURCE_CODE: ${DEFAULT_SOURCE_CODE}
     depends_on:
       - mongo
 
@@ -85,6 +89,8 @@ services:
       JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}
       APPLICANT_SERVICE_URL: http://applicant-service:${APPLICANT_SERVICE_PORT}
       NOTIFICATION_SERVICE_URL: http://notification-service:${NOTIFICATION_SERVICE_PORT}
+      DEFAULT_SOURCE_NAME: ${DEFAULT_SOURCE_NAME}
+      DEFAULT_SOURCE_CODE: ${DEFAULT_SOURCE_CODE}
     depends_on:
       - mongo
       - redis

@@ -23,7 +23,7 @@ export interface JobDocument {
     experienceYears: number;
     location: string;
   };
-  status: "open" | "closed" | "archived";
+  status: "draft" | "published" | "closed" | "archived";
   threshold: number;
   shortlist: number;
   requiredDocuments: RequiredDocument[];
@@ -51,8 +51,8 @@ const jobSchema = new Schema<JobDocument>(
     },
     status: { 
       type: String, 
-      enum: ["open", "closed", "archived"], 
-      default: "open" 
+      enum: ["draft", "published", "closed", "archived"], 
+      default: "draft" 
     },
     threshold: { type: Number, default: 0 },
     shortlist: { type: Number, default: 0 },

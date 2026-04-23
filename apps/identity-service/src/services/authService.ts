@@ -10,6 +10,15 @@ import { sendPasswordResetEmail, sendVerificationEmail } from "./emailService";
 const hashToken = (token: string): string => crypto.createHash("sha256").update(token).digest("hex");
 const randomToken = (): string => crypto.randomBytes(32).toString("hex");
 const oauthClient = new OAuth2Client();
+const DEFAULT_SOURCE = { name: env.defaultSourceName, code: env.defaultSourceCode, deletable: false };
+
+const ensureDefaultSource = (user: any) => {
+  if (!user.sources) user.sources = [];
+  const hasDefault = user.sources.some((s: any) => s.code === DEFAULT_SOURCE.code);
+  if (!hasDefault) {
+    user.sources.push(DEFAULT_SOURCE);
+  }
+};
 
 const signAccessToken = (userId: string, email: string) =>
   jwt.sign({ userId, email, type: "access" }, env.jwtSecret, { expiresIn: env.accessTokenExpiry as any });
@@ -33,6 +42,9 @@ export const login = async (email: string, password: string) => {
   if (!user.emailVerified) {
     throw new AppError("Please verify your email before login", 403);
   }
+
+  ensureDefaultSource(user);
+  await user.save();
 
   const accessToken = signAccessToken(user.id, user.email);
   const refreshToken = signRefreshToken(user.id, user.email, user.refreshTokenVersion);
@@ -79,6 +91,7 @@ export const loginOrRegisterWithGoogle = async (idToken: string) => {
   
   user.googleId = googleId;
   user.emailVerified = true;
+  ensureDefaultSource(user);
   await user.save();
 
   const accessToken = signAccessToken(user.id, user.email);

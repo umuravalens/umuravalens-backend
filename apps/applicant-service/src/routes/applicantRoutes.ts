@@ -17,8 +17,8 @@ import { upload } from "../utils/upload";
 const router = Router();
 
 router.post("/analyze", upload.single("resume"), extractInfo);
-router.post("/apply", applyApplicant);
-router.post("/verify/:applicantId", verifyApplicant);
+router.post("/apply", upload.array("files", 10), applyApplicant);
+router.post("/verify/:applicantId", upload.array("files", 10), verifyApplicant);
 
 router.get("/applicants/internal/:jobId", listApplicantsByJobInternal);
 router.patch("/applicants/internal/:id/ai", updateApplicantAIInternal);
