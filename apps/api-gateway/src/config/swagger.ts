@@ -7,7 +7,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
       title: "UmuravaLens API Gateway",
       version: "1.1.0",
       description:
-        "Production-oriented API docs for authentication, recruitment workflow, and dashboard endpoints. **Public job and application routes** (`/public/jobs/...`, applicant uploads under `/uploads/...`) do **not** require a JWT; omit `Authorization` for those calls. In Swagger UI, operations with `security: []` ignore the global Authorize token."
+        "Production-oriented API docs for authentication, recruitment workflow, and dashboard endpoints. \n\n **[View Raw JSON API Specification](/api/v3)** \n\n **Public job and application routes** (`/public/jobs/...`, applicant uploads under `/uploads/...`) do **not** require a JWT; omit `Authorization` for those calls. In Swagger UI, operations with `security: []` ignore the global Authorize token."
     },
     servers: [{ url: "http://localhost:8080", description: "Local gateway" }],
     tags: [
@@ -25,9 +25,166 @@ const swaggerOptions: swaggerJsdoc.Options = {
         ApiResponse: {
           type: "object",
           properties: {
-            success: { type: "boolean" },
-            data: {},
-            error: { type: "string", nullable: true }
+            success: { type: "boolean", example: true },
+            data: { type: "object" },
+            error: { type: "string", nullable: true, example: null }
+          }
+        },
+        User: {
+          type: "object",
+          properties: {
+            id: { type: "string", example: "60d0fe4f5311236168a109ca" },
+            firstname: { type: "string", example: "John" },
+            lastname: { type: "string", example: "Doe" },
+            email: { type: "string", example: "john.doe@example.com" },
+            isVerified: { type: "boolean", example: true }
+          }
+        },
+        AuthResponse: {
+          type: "object",
+          properties: {
+            accessToken: { type: "string" },
+            refreshToken: { type: "string" },
+            user: { $ref: "#/components/schemas/User" }
+          }
+        },
+        TokenResponse: {
+          type: "object",
+          properties: {
+            accessToken: { type: "string" },
+            refreshToken: { type: "string" }
+          }
+        },
+        Document: {
+          type: "object",
+          properties: {
+            documentName: { type: "string", example: "Resume" },
+            originalFileName: { type: "string", example: "my_resume.pdf" },
+            storedFileName: { type: "string", example: "1712345678-my_resume.pdf" },
+            uploadDate: { type: "string", format: "date-time" },
+            fileUrl: { type: "string", example: "http://localhost:8080/uploads/1712345678-my_resume.pdf" },
+            isAdditional: { type: "boolean", example: false },
+            isVerified: { type: "boolean", example: true },
+            sendToAI: { type: "boolean", example: true }
+          }
+        },
+        Job: {
+          type: "object",
+          properties: {
+            id: { type: "string", example: "60d0fe4f5311236168a109cb" },
+            title: { type: "string", example: "Senior Backend Engineer" },
+            description: { type: "string", example: "Focus on Node.js and Microservices" },
+            status: { type: "string", enum: ["draft", "published", "closed", "archived"], example: "published" },
+            unverifiedFilesCount: { type: "number", example: 0 },
+            publicId: { type: "string", example: "senior-backend-123" },
+            requiredDocuments: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  documentType: { type: "string", example: "Resume" },
+                  isRequired: { type: "boolean", example: true },
+                  sendToAI: { type: "boolean", example: true }
+                }
+              }
+            },
+            requirements: {
+              type: "object",
+              properties: {
+                skills: { type: "array", items: { type: "string" }, example: ["Node.js", "TypeScript"] },
+                experience: { type: "number", example: 5 }
+              }
+            },
+            location: { type: "string", example: "Kigali, Rwanda" },
+            employmentType: { type: "string", example: "Full-time" },
+            createdAt: { type: "string", format: "date-time" }
+          }
+        },
+        Applicant: {
+          type: "object",
+          properties: {
+            applicantId: { type: "string", example: "60d0fe4f5311236168a109cc" },
+            name: { type: "string", example: "Jane Smith" },
+            email: { type: "string", example: "jane.smith@example.com" },
+            phoneNumber: { type: "string", example: "+250780000000" },
+            status: { type: "string", enum: ["draft", "pending", "shortlisted", "rejected"], example: "pending" },
+            jobId: { type: "string", example: "60d0fe4f5311236168a109cb" },
+            profileData: {
+              type: "object",
+              properties: {
+                basicInfo: {
+                  type: "object",
+                  properties: {
+                    firstName: { type: "string", example: "Jane" },
+                    lastName: { type: "string", example: "Smith" },
+                    headline: { type: "string", example: "Full Stack Developer" },
+                    bio: { type: "string", example: "Passionate about clean code." },
+                    location: { type: "string", example: "London, UK" }
+                  }
+                },
+                skills: { 
+                  type: "array", 
+                  items: { 
+                    type: "object", 
+                    properties: { 
+                      name: { type: "string", example: "React" }, 
+                      level: { type: "string", example: "Expert" }, 
+                      yearsOfExperience: { type: "number", example: 4 } 
+                    } 
+                  } 
+                },
+                experience: { 
+                  type: "array", 
+                  items: { 
+                    type: "object",
+                    properties: {
+                      company: { type: "string", example: "Tech Corp" },
+                      role: { type: "string", example: "Lead Developer" },
+                      startDate: { type: "string" },
+                      endDate: { type: "string" },
+                      description: { type: "string" }
+                    }
+                  } 
+                }
+              }
+            },
+            documents: { type: "array", items: { $ref: "#/components/schemas/Document" } },
+            aiAnalysis: {
+              type: "object",
+              properties: {
+                matchScore: { type: "number", example: 85 },
+                rank: { type: "number", example: 1 },
+                explanation: { type: "string" }
+              }
+            },
+            createdAt: { type: "string", format: "date-time" }
+          }
+        },
+        Screening: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            jobId: { type: "string" },
+            status: { type: "string", enum: ["pending", "processing", "completed", "failed"] },
+            stats: {
+              type: "object",
+              properties: {
+                totalApplicants: { type: "number" },
+                topScore: { type: "number" },
+                shortlistedCount: { type: "number" }
+              }
+            },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" }
+          }
+        },
+        Source: {
+          type: "object",
+          properties: {
+            _id: { type: "string", example: "60d0fe4f5311236168a109cd" },
+            code: { type: "string", example: "LINKEDIN" },
+            name: { type: "string", example: "LinkedIn Ads" },
+            deletable: { type: "boolean", example: true }
           }
         }
       }
@@ -55,7 +212,31 @@ const swaggerOptions: swaggerJsdoc.Options = {
             }
           },
           responses: {
-            "201": { description: "User registered" },
+            "201": {
+              description: "User registered",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string" },
+                              email: { type: "string" },
+                              message: { type: "string" }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
             "409": { description: "Email already in use" }
           }
         }
@@ -80,7 +261,26 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "200": { description: "Returns access + refresh tokens" } }
+          responses: {
+            "200": {
+              description: "Login success",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/AuthResponse" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/auth/google": {
@@ -103,7 +303,26 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "200": { description: "Returns access + refresh tokens" } }
+          responses: {
+            "200": {
+              description: "Returns access + refresh tokens",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/AuthResponse" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/auth/refresh-token": {
@@ -123,7 +342,26 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "200": { description: "Token refreshed" } }
+          responses: {
+            "200": {
+              description: "Token refreshed",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/TokenResponse" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/auth/forgot-password": {
@@ -143,7 +381,31 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "200": { description: "Reset initiated" } }
+          responses: {
+            "200": {
+              description: "Reset initiated",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              sent: { type: "boolean", example: true }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/auth/verify-email": {
@@ -164,7 +426,30 @@ const swaggerOptions: swaggerJsdoc.Options = {
             }
           },
           responses: {
-            "200": { description: "Email verified" },
+            "200": {
+              description: "Email verified",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              verified: { type: "boolean", example: true },
+                              email: { type: "string" }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
             "400": { description: "Invalid or expired token" }
           }
         }
@@ -186,7 +471,31 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "200": { description: "Verification email sent" } }
+          responses: { 
+            "200": { 
+              description: "Verification email sent",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              sent: { type: "boolean", example: true }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            } 
+          }
         }
       },
       "/auth/reset-password": {
@@ -209,7 +518,31 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "200": { description: "Password reset" } }
+          responses: {
+            "200": {
+              description: "Password reset",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              reset: { type: "boolean", example: true }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/auth/me": {
@@ -217,7 +550,26 @@ const swaggerOptions: swaggerJsdoc.Options = {
           tags: ["Identity Service"],
           summary: "Get profile",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Profile" } }
+          responses: {
+            "200": {
+              description: "User Profile",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/User" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         },
         patch: {
           tags: ["Identity Service"],
@@ -238,7 +590,12 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "200": { description: "Profile updated" } }
+          responses: {
+            "200": {
+              description: "Profile updated",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/ApiResponse" } } }
+            }
+          }
         }
       },
       "/auth/change-password": {
@@ -261,7 +618,26 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "200": { description: "Password changed" } }
+          responses: {
+            "200": {
+              description: "Password changed",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { type: "object", properties: { changed: { type: "boolean", example: true } } }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/auth/logout": {
@@ -269,7 +645,31 @@ const swaggerOptions: swaggerJsdoc.Options = {
           tags: ["Identity Service"],
           summary: "Logout current session",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Logged out" } }
+          responses: {
+            "200": { 
+              description: "Logged out",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              loggedOut: { type: "boolean", example: true }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/auth/logout-all": {
@@ -277,7 +677,31 @@ const swaggerOptions: swaggerJsdoc.Options = {
           tags: ["Identity Service"],
           summary: "Logout all sessions",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Logged out all" } }
+          responses: { 
+            "200": { 
+              description: "Logged out all",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              loggedOut: { type: "boolean", example: true }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/sources": {
@@ -285,7 +709,26 @@ const swaggerOptions: swaggerJsdoc.Options = {
           tags: ["Identity Service"],
           summary: "List traffic/candidate sources",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Sources list" } }
+          responses: {
+            "200": {
+              description: "Sources list",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { type: "array", items: { $ref: "#/components/schemas/Source" } }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         },
         post: {
           tags: ["Identity Service"],
@@ -306,7 +749,26 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "201": { description: "Source created" } }
+          responses: { 
+            "201": { 
+              description: "Source created; returns full list",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { type: "array", items: { $ref: "#/components/schemas/Source" } }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         },
         put: {
           tags: ["Identity Service"],
@@ -328,7 +790,26 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "200": { description: "Source updated" } }
+          responses: { 
+            "200": { 
+              description: "Source updated; returns full list",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { type: "array", items: { $ref: "#/components/schemas/Source" } }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/sources/{code}": {
@@ -337,7 +818,26 @@ const swaggerOptions: swaggerJsdoc.Options = {
           summary: "Delete source",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "code", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Deleted" } }
+          responses: { 
+            "200": { 
+              description: "Deleted; returns full list",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { type: "array", items: { $ref: "#/components/schemas/Source" } }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/jobs/public/{publicId}/{sourceCode}": {
@@ -350,7 +850,40 @@ const swaggerOptions: swaggerJsdoc.Options = {
             { in: "path", name: "publicId", required: true, schema: { type: "string" } },
             { in: "path", name: "sourceCode", required: false, schema: { type: "string" }, description: "Optional source tracker. Defaults to platform root if empty." }
           ],
-          responses: { "200": { description: "Public Job Details" }, "403": { description: "Invalid source" } }
+          responses: { 
+            "200": { 
+              description: "Public Job Details",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string" },
+                              recruiterId: { type: "string" },
+                              publicId: { type: "string" },
+                              title: { type: "string" },
+                              description: { type: "string" },
+                              requirements: { $ref: "#/components/schemas/Job/properties/requirements" },
+                              status: { type: "string" },
+                              requiredDocuments: { $ref: "#/components/schemas/Job/properties/requiredDocuments" },
+                              activeSource: { type: "string", example: "LINKEDIN" }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }, 
+            "403": { description: "Invalid source" } 
+          }
         }
       },
       "/uploads/{filename}": {
@@ -374,7 +907,32 @@ const swaggerOptions: swaggerJsdoc.Options = {
             { in: "query", name: "page", schema: { type: "integer", minimum: 1, default: 1 } },
             { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
           ],
-          responses: { "200": { description: "Jobs list" } }
+          responses: {
+            "200": {
+              description: "Jobs list",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              items: { type: "array", items: { $ref: "#/components/schemas/Job" } },
+                              pagination: { type: "object" }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         },
         post: {
           tags: ["Job Service"],
@@ -417,7 +975,26 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "201": { description: "Created" } }
+          responses: { 
+            "201": { 
+              description: "Created",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/Job" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/jobs/{id}": {
@@ -426,21 +1003,82 @@ const swaggerOptions: swaggerJsdoc.Options = {
           summary: "Get recruiter job by ID",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Job" } }
+          responses: {
+            "200": {
+              description: "Job Details",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/Job" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         },
         patch: {
           tags: ["Job Service"],
           summary: "Update job",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Updated" } }
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Job" } } }
+          },
+          responses: { 
+            "200": { 
+              description: "Updated", 
+              content: { 
+                "application/json": { 
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/Job" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         },
         delete: {
           tags: ["Job Service"],
           summary: "Delete job",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Deleted" } }
+          responses: { 
+            "200": { 
+              description: "Deleted",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { type: "object", properties: { deleted: { type: "boolean", example: true } } }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/jobs/{id}/publish": {
@@ -450,7 +1088,33 @@ const swaggerOptions: swaggerJsdoc.Options = {
           description: "Sets status to **published** so the job appears on `GET /public/jobs/{publicId}` and accepts applications.",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Published; includes publicUrl" } }
+          responses: { 
+            "200": { 
+              description: "Published; includes publicUrl",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              jobId: { type: "string" },
+                              publicUrl: { type: "string" },
+                              status: { type: "string" }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/applicants/analyze": {
@@ -477,43 +1141,53 @@ const swaggerOptions: swaggerJsdoc.Options = {
               content: {
                 "application/json": {
                   schema: {
-                    type: "object",
-                    properties: {
-                      extracted_info: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
                         type: "object",
                         properties: {
-                          name: { type: "string" },
-                          email: { type: "string" },
-                          phoneNumber: { type: "string" },
-                          profileData: {
+                          data: {
                             type: "object",
                             properties: {
-                              basicInfo: {
+                              extracted_info: {
                                 type: "object",
                                 properties: {
-                                  firstName: { type: "string" },
-                                  lastName: { type: "string" },
+                                  name: { type: "string" },
+                                  email: { type: "string" },
                                   phoneNumber: { type: "string" },
-                                  headline: { type: "string" },
-                                  bio: { type: "string" },
-                                  location: { type: "string" }
+                                  profileData: {
+                                    type: "object",
+                                    properties: {
+                                      basicInfo: {
+                                        type: "object",
+                                        properties: {
+                                          firstName: { type: "string" },
+                                          lastName: { type: "string" },
+                                          phoneNumber: { type: "string" },
+                                          headline: { type: "string" },
+                                          bio: { type: "string" },
+                                          location: { type: "string" }
+                                        }
+                                      },
+                                      skills: { type: "array", items: { type: "object", properties: { name: { type: "string" }, level: { type: "string" }, yearsOfExperience: { type: "number" } } } },
+                                      languages: { type: "array", items: { type: "object", properties: { name: { type: "string" }, proficiency: { type: "string" } } } },
+                                      experience: { type: "array", items: { type: "object", properties: { company: { type: "string" }, role: { type: "string" }, startDate: { type: "string" }, endDate: { type: "string" }, description: { type: "string" }, technologies: { type: "array", items: { type: "string" } }, isCurrent: { type: "boolean" } } } },
+                                      education: { type: "array", items: { type: "object", properties: { institution: { type: "string" }, degree: { type: "string" }, fieldOfStudy: { type: "string" }, startYear: { type: "number" }, endYear: { type: "number" } } } },
+                                      certifications: { type: "array", items: { type: "object", properties: { name: { type: "string" }, issuer: { type: "string" }, issueDate: { type: "string" } } } },
+                                      projects: { type: "array", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, technologies: { type: "array", items: { type: "string" } }, role: { type: "string" }, link: { type: "string" }, startDate: { type: "string" }, endDate: { type: "string" } } } },
+                                      availability: { type: "object", properties: { status: { type: "string" }, type: { type: "string" }, startDate: { type: "string" } } },
+                                      socialLinks: { type: "object", additionalProperties: { type: "string" } }
+                                    }
+                                  }
                                 }
                               },
-                              skills: { type: "array", items: { type: "object", properties: { name: { type: "string" }, level: { type: "string" }, yearsOfExperience: { type: "number" } } } },
-                              languages: { type: "array", items: { type: "object", properties: { name: { type: "string" }, proficiency: { type: "string" } } } },
-                              experience: { type: "array", items: { type: "object", properties: { company: { type: "string" }, role: { type: "string" }, startDate: { type: "string" }, endDate: { type: "string" }, description: { type: "string" }, technologies: { type: "array", items: { type: "string" } }, isCurrent: { type: "boolean" } } } },
-                              education: { type: "array", items: { type: "object", properties: { institution: { type: "string" }, degree: { type: "string" }, fieldOfStudy: { type: "string" }, startYear: { type: "number" }, endYear: { type: "number" } } } },
-                              certifications: { type: "array", items: { type: "object", properties: { name: { type: "string" }, issuer: { type: "string" }, issueDate: { type: "string" } } } },
-                              projects: { type: "array", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, technologies: { type: "array", items: { type: "string" } }, role: { type: "string" }, link: { type: "string" }, startDate: { type: "string" }, endDate: { type: "string" } } } },
-                              availability: { type: "object", properties: { status: { type: "string" }, type: { type: "string" }, startDate: { type: "string" } } },
-                              socialLinks: { type: "object", additionalProperties: { type: "string" } }
+                              missingFields: { type: "object", description: "Report of fields the AI couldn't find" },
+                              tempFile: { type: "object", properties: { filename: { type: "string" }, path: { type: "string" }, originalName: { type: "string" } } }
                             }
                           }
                         }
-                      },
-                      missingFields: { type: "object", description: "Report of fields the AI couldn't find" },
-                      tempFile: { type: "object", properties: { filename: { type: "string" }, path: { type: "string" }, originalName: { type: "string" } } }
-                    }
+                      }
+                    ]
                   }
                 }
               }
@@ -535,9 +1209,9 @@ const swaggerOptions: swaggerJsdoc.Options = {
                   type: "object",
                   required: ["verifiedData", "jobId", "source_code"],
                   properties: {
-                    verifiedData: { 
-                      type: "string", 
-                      description: "JSON string of candidate info (follows same structure as Analyze response)" 
+                    verifiedData: {
+                      type: "string",
+                      description: "JSON string of candidate info (follows same structure as Analyze response)"
                     },
                     jobId: { type: "string" },
                     source_code: { type: "string" },
@@ -548,25 +1222,25 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { 
-            "201": { 
-              description: "Application submitted (Status: draft)",
+          responses: {
+            "201": {
+              description: "Application submitted",
               content: {
                 "application/json": {
                   schema: {
-                    type: "object",
-                    properties: {
-                      applicantId: { type: "string" },
-                      status: { type: "string", example: "draft" },
-                      name: { type: "string" },
-                      email: { type: "string" },
-                      phoneNumber: { type: "string" },
-                      profileData: { type: "object" }
-                    }
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/Applicant" }
+                        }
+                      }
+                    ]
                   }
                 }
               }
-            } 
+            }
           }
         }
       },
@@ -583,29 +1257,32 @@ const swaggerOptions: swaggerJsdoc.Options = {
                 schema: {
                   type: "object",
                   properties: {
-                    profileData: { type: "string", description: "JSON string of updated profile info" },
+                    applicant: { type: "string", description: "Full Applicant JSON object (name, email, phoneNumber, profileData)" },
                     files: { type: "array", items: { type: "string", format: "binary" }, description: "Additional docs during verification" }
                   }
                 }
               }
             }
           },
-          responses: { 
-            "200": { 
-              description: "Verified application (Promoted to 'pending' if no changes detected)",
+          responses: {
+            "200": {
+              description: "Verified application",
               content: {
                 "application/json": {
                   schema: {
-                    type: "object",
-                    properties: {
-                      applicantId: { type: "string" },
-                      status: { type: "string", example: "pending" },
-                      profileData: { type: "object" }
-                    }
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/Applicant" }
+                        }
+                      }
+                    ]
                   }
                 }
               }
-            } 
+            }
           }
         }
       },
@@ -619,13 +1296,57 @@ const swaggerOptions: swaggerJsdoc.Options = {
             { in: "query", name: "page", schema: { type: "integer", minimum: 1, default: 1 } },
             { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
           ],
-          responses: { "200": { description: "Applicants" } }
+          responses: { 
+            "200": { 
+              description: "Applicants list",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              items: { type: "array", items: { $ref: "#/components/schemas/Applicant" } },
+                              pagination: { type: "object" }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         },
         post: {
           tags: ["Applicant Service"],
           summary: "Create applicant manually",
           security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Created" } }
+          responses: { 
+            "201": { 
+              description: "Created",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/Applicant" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/applicants/{jobId}": {
@@ -638,7 +1359,32 @@ const swaggerOptions: swaggerJsdoc.Options = {
             { in: "query", name: "page", schema: { type: "integer", minimum: 1, default: 1 } },
             { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
           ],
-          responses: { "200": { description: "Applicants for job" } }
+          responses: { 
+            "200": { 
+              description: "Applicants for job",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              items: { type: "array", items: { $ref: "#/components/schemas/Applicant" } },
+                              pagination: { type: "object" }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/applicant-items/{id}": {
@@ -648,21 +1394,115 @@ const swaggerOptions: swaggerJsdoc.Options = {
           security: [{ bearerAuth: [] }],
           description: "Each `documents[]` entry includes `fileUrl` for opening the file on this API host.",
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Applicant" } }
+          responses: {
+            "200": {
+              description: "Applicant details",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/Applicant" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         },
         patch: {
           tags: ["Applicant Service"],
           summary: "Update applicant",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Updated" } }
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Applicant" } } }
+          },
+          responses: {
+            "200": {
+              description: "Updated applicant",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/Applicant" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         },
         delete: {
           tags: ["Applicant Service"],
           summary: "Delete applicant",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Deleted" } }
+          responses: { 
+            "200": { 
+              description: "Deleted",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { type: "object", properties: { deleted: { type: "boolean", example: true } } }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/applicant-items/{id}/documents/{storedFileName}/verify": {
+        patch: {
+          tags: ["Applicant Service"],
+          summary: "Verify an additional document (Recruiter Only)",
+          description: "Marks a specific document as verified. If this is the last unverified additional document for the applicant, it decrements the total count on the job card.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { in: "path", name: "id", required: true, schema: { type: "string" }, description: "Applicant ID" },
+            { in: "path", name: "storedFileName", required: true, schema: { type: "string" }, description: "The unique stored filename of the document" }
+          ],
+          responses: {
+            "200": { 
+              description: "Document verified; returns updated applicant object",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { $ref: "#/components/schemas/Applicant" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "404": { description: "Applicant or Document not found" }
+          }
         }
       },
       "/screenings": {
@@ -676,7 +1516,32 @@ const swaggerOptions: swaggerJsdoc.Options = {
             { in: "query", name: "page", schema: { type: "integer", minimum: 1, default: 1 } },
             { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
           ],
-          responses: { "200": { description: "Screenings" } }
+          responses: { 
+            "200": { 
+              description: "Screenings list",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              items: { type: "array", items: { $ref: "#/components/schemas/Screening" } },
+                              pagination: { type: "object" }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/screenings/run": {
@@ -696,7 +1561,26 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { "202": { description: "Queued" } }
+          responses: {
+            "202": {
+              description: "Screening Queued",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: { type: "object", properties: { screeningId: { type: "string" }, jobId: { type: "string" } } }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/screenings/{id}/status": {
@@ -705,7 +1589,34 @@ const swaggerOptions: swaggerJsdoc.Options = {
           summary: "Get screening status",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Status" } }
+          responses: { 
+            "200": { 
+              description: "Screening Status",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string" },
+                              status: { type: "string" },
+                              progress: { type: "number" },
+                              updatedAt: { type: "string", format: "date-time" }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/screenings/{id}/results": {
@@ -714,7 +1625,34 @@ const swaggerOptions: swaggerJsdoc.Options = {
           summary: "Get screening results",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { "200": { description: "Results" } }
+          responses: {
+            "200": {
+              description: "Final AI Screening results",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              totalApplicants: { type: "number" },
+                              topScore: { type: "number" },
+                              shortlistedCount: { type: "number" },
+                              items: { type: "array", items: { $ref: "#/components/schemas/Applicant" } }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "/dashboard/overview": {
@@ -722,7 +1660,74 @@ const swaggerOptions: swaggerJsdoc.Options = {
           tags: ["Dashboard Service"],
           summary: "Get dashboard overview metrics",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Overview" } }
+          responses: {
+            "200": {
+              description: "Overview Metrics",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              summary: {
+                                type: "object",
+                                properties: {
+                                  totalJobs: { type: "number" },
+                                  totalApplicants: { type: "number" },
+                                  totalScreenings: { type: "number" },
+                                  pendingScreenings: { type: "number" },
+                                  processingScreenings: { type: "number" },
+                                  completedScreenings: { type: "number" },
+                                  averageTopScore: { type: "number" },
+                                  averageRequiredSkillsPerJob: { type: "number" }
+                                }
+                              },
+                              pipeline: { type: "object" },
+                              breakdowns: { type: "object" },
+                              jobs: { 
+                                type: "object",
+                                properties: {
+                                  topByApplicants: { type: "array", items: { type: "object" } },
+                                  latest: { type: "array", items: { $ref: "#/components/schemas/Job" } }
+                                }
+                              },
+                              recentActivity: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    type: { type: "string" },
+                                    timestamp: { type: "string", format: "date-time" },
+                                    title: { type: "string" },
+                                    jobId: { type: "string" }
+                                  }
+                                }
+                              },
+                              alerts: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    severity: { type: "string", enum: ["info", "warning"] },
+                                    message: { type: "string" }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

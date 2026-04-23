@@ -3,6 +3,7 @@ import { NextFunction, Request, Response } from "express";
 import { AppError, ok } from "@umurava/shared-utils";
 import { env } from "../config/env";
 import { Applicant, ApplicantDocumentAttachment } from "../models/Applicant";
+import { emitJobMetricsUpdate } from "../utils/queue";
 
 /** Same origin as API gateway — use `new URL(doc.fileUrl, apiBase)` on the frontend if needed. */
 const attachDocumentFileUrls = <T extends { documents?: ApplicantDocumentAttachment[] }>(row: T) => {
@@ -67,7 +68,10 @@ const normalizeDocuments = (raw: unknown): ApplicantDocumentAttachment[] => {
       storedFileName,
       originalFileName: doc.originalFileName ? String(doc.originalFileName) : "",
       uploadDate: doc.uploadDate ? new Date(String(doc.uploadDate)) : new Date(),
-      fileUrl: doc.fileUrl ? String(doc.fileUrl) : `/uploads/${storedFileName}`
+      fileUrl: doc.fileUrl ? String(doc.fileUrl) : `/uploads/${storedFileName}`,
+      isAdditional: !!doc.isAdditional,
+      isVerified: !!doc.isVerified,
+      sendToAI: !!doc.sendToAI
     });
   }
   return out;
@@ -158,17 +162,29 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
     const docList: ApplicantDocumentAttachment[] = (otherDocsJson || []).map((d: any) => ({
       ...d,
       uploadDate: new Date(),
-      fileUrl: `/uploads/${d.storedFileName}`
+      fileUrl: `/uploads/${d.storedFileName}`,
+      isAdditional: !!d.isAdditional,
+      isVerified: !!d.isVerified,
+      sendToAI: !!d.sendToAI
     }));
 
     for (const file of uploadedFiles) {
+      const isReq = requiredDocs.some((rd: any) => rd.documentType === (file.originalname.includes("Resume") ? "Resume" : "Other"));
       docList.push({
         documentName: file.originalname.includes("Resume") ? "Resume" : "Other",
         originalFileName: file.originalname,
         storedFileName: file.filename,
         uploadDate: new Date(),
-        fileUrl: `/uploads/${file.filename}`
+        fileUrl: `/uploads/${file.filename}`,
+        isAdditional: !isReq,
+        isVerified: false,
+        sendToAI: false // Recruiter controlled for additional, job controlled for required
       });
+    }
+
+    const additionalCount = docList.filter(d => d.isAdditional).length;
+    if (additionalCount > 3) {
+      throw new AppError("Maximum 3 additional documents allowed", 400);
     }
 
     const resumeDoc = docList.find(d => d.documentName === 'Resume');
@@ -187,6 +203,10 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
       documents: docList
     });
 
+    if (additionalCount > 0) {
+      await emitJobMetricsUpdate(jobId, "increment");
+    }
+
     res.status(201).json(ok(serializeApplicant(applicant)));
   } catch (error) {
     next(error);
@@ -197,9 +217,10 @@ export const verifyApplicant = async (req: Request, res: Response, next: NextFun
   try {
     const { applicantId } = req.params;
     const rawBody = req.body as Record<string, unknown>;
-    const updatedData = typeof rawBody.profileData === 'string' ? JSON.parse(rawBody.profileData) : rawBody;
-    // In verify, we might receive the whole object or just profileData. Handle both.
-    const profileData = updatedData.profileData || updatedData;
+    
+    // Accept the whole applicant object or just profileData from verify form
+    const updatedApplicant = typeof rawBody.applicant === 'string' ? JSON.parse(rawBody.applicant) : (rawBody.applicant || rawBody);
+    const profileData = updatedApplicant.profileData;
 
     const applicant = await Applicant.findById(applicantId);
     if (!applicant) {
@@ -213,14 +234,18 @@ export const verifyApplicant = async (req: Request, res: Response, next: NextFun
     // Check for changes - Simple comparison of email for now as per instructions "if the response comes as it was without any changes"
     // Instruction: "if the response comes as it was without any changes... change status to pending... if there is a change return the user with the draft response still"
     // We'll compare some key fields or the whole object.
-    const isModified = JSON.stringify(updatedData.profileData) !== JSON.stringify(applicant.profileData);
+    // Check for changes
+    const isModified = JSON.stringify(profileData) !== JSON.stringify(applicant.profileData) || 
+                       updatedApplicant.name !== applicant.name ||
+                       updatedApplicant.email !== applicant.email ||
+                       updatedApplicant.phoneNumber !== applicant.phoneNumber;
 
     if (isModified) {
       // Update the draft and return it
-      applicant.profileData = profileData;
-      if (updatedData.name) applicant.name = updatedData.name;
-      if (updatedData.email) applicant.email = updatedData.email;
-      if (updatedData.phoneNumber) applicant.phoneNumber = updatedData.phoneNumber;
+      if (profileData) applicant.profileData = profileData;
+      if (updatedApplicant.name) applicant.name = updatedApplicant.name;
+      if (updatedApplicant.email) applicant.email = updatedApplicant.email;
+      if (updatedApplicant.phoneNumber) applicant.phoneNumber = updatedApplicant.phoneNumber;
 
       // Handle new files in verify step
       const uploadedFiles = (req.files as Express.Multer.File[]) || [];
@@ -230,7 +255,10 @@ export const verifyApplicant = async (req: Request, res: Response, next: NextFun
           originalFileName: file.originalname,
           storedFileName: file.filename,
           uploadDate: new Date(),
-          fileUrl: `/uploads/${file.filename}`
+          fileUrl: `/uploads/${file.filename}`,
+          isAdditional: true, // New files in verify step are treated as additional by default
+          isVerified: false,
+          sendToAI: false
         });
       }
 
@@ -248,6 +276,21 @@ export const verifyApplicant = async (req: Request, res: Response, next: NextFun
 
     if (existing) {
       throw new AppError("An application with this email already exists for this job", 400);
+    }
+
+    // SYNC AI FLAGS based on Job configuration
+    const jobRes = await axios.get(`${env.jobServiceUrl}/jobs/internal/${applicant.jobId}`, { validateStatus: () => true });
+    if (jobRes.status === 200 && jobRes.data?.success) {
+      const job = jobRes.data.data;
+      applicant.documents = applicant.documents.map(doc => {
+        if (!doc.isAdditional) {
+          const reqDoc = job.requiredDocuments.find((rd: any) => rd.documentType === doc.documentName);
+          if (reqDoc) {
+            doc.sendToAI = reqDoc.sendToAI;
+          }
+        }
+        return doc;
+      });
     }
 
     applicant.status = "pending";
@@ -389,6 +432,38 @@ export const updateApplicantAIInternal = async (req: Request, res: Response, nex
 
     if (!applicant) {
       throw new AppError("Applicant not found", 404);
+    }
+
+    res.json(ok(serializeApplicant(applicant)));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyDocument = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const recruiterId = getRecruiterId(req); // Or allow based on internal auth
+    const { id, storedFileName } = req.params;
+
+    const applicant = await Applicant.findById(id);
+    if (!applicant) {
+      throw new AppError("Applicant not found", 404);
+    }
+
+    const docIndex = applicant.documents.findIndex(d => d.storedFileName === storedFileName);
+    if (docIndex === -1) {
+      throw new AppError("Document not found", 404);
+    }
+
+    applicant.documents[docIndex].isVerified = true;
+    
+    // Check if this was the last unverified additional document
+    const remainingUnverifiedAdditional = applicant.documents.some(d => d.isAdditional && !d.isVerified);
+    
+    await applicant.save();
+
+    if (!remainingUnverifiedAdditional) {
+      await emitJobMetricsUpdate(applicant.jobId, "decrement");
     }
 
     res.json(ok(serializeApplicant(applicant)));

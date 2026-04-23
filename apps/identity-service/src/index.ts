@@ -1,7 +1,7 @@
 import cors from "cors";
 import express from "express";
 import morgan from "morgan";
-import { logger, ok } from "@umurava/shared-utils";
+import { logger, ok, getUnderstandableMessage } from "@umurava/shared-utils";
 import { connectDb } from "./config/db";
 import { env } from "./config/env";
 import authRoutes from "./routes/authRoutes";
@@ -21,6 +21,6 @@ app.use(errorHandler);
 connectDb(env.mongodbUri).then(() => {
   app.listen(env.port, () => logger.info({ message: `Identity service running on port ${env.port}` }));
 }).catch((error) => {
-  logger.error({ message: "Failed to start identity service", error });
+  logger.error({ message: getUnderstandableMessage(error), error });
   process.exit(1);
 });

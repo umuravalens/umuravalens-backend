@@ -32,3 +32,23 @@ export const fail = (error: string): ApiResponse<null> => {
     error
   };
 };
+export const getUnderstandableMessage = (err: any): string => {
+  const msg = err?.message || String(err);
+
+  // Database connection issues
+  if (msg.includes("ECONNREFUSED") && (msg.includes("27017") || msg.includes("mongo"))) {
+    return "Unable to connect to mongo database";
+  }
+
+  // Microservice connection issues (Axios 1.x AggregateError or ECONNREFUSED)
+  if (
+    msg === "AggregateError" || 
+    msg.includes("ECONNREFUSED") || 
+    msg.includes("ENOTFOUND") || 
+    msg.includes("ECONNRESET")
+  ) {
+    return "The requested service is currently unreachable. Please ensure all microservices are running.";
+  }
+
+  return msg;
+};

@@ -27,6 +27,7 @@ export interface JobDocument {
   threshold: number;
   shortlist: number;
   requiredDocuments: RequiredDocument[];
+  unverifiedFilesCount: number;
   publicId: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -63,6 +64,7 @@ const jobSchema = new Schema<JobDocument>(
         sendToAI: { type: Boolean, default: false }
       }
     ],
+    unverifiedFilesCount: { type: Number, default: 0 },
     publicId: { type: String, unique: true, index: true }
   },
   { timestamps: true }
