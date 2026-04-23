@@ -24,7 +24,6 @@ export interface JobDocument {
     location: string;
   };
   status: "draft" | "published" | "closed" | "archived";
-  threshold: number;
   shortlist: number;
   requiredDocuments: RequiredDocument[];
   unverifiedFilesCount: number;
@@ -55,7 +54,6 @@ const jobSchema = new Schema<JobDocument>(
       enum: ["draft", "published", "closed", "archived"], 
       default: "draft" 
     },
-    threshold: { type: Number, default: 0 },
     shortlist: { type: Number, default: 0 },
     requiredDocuments: [
       {

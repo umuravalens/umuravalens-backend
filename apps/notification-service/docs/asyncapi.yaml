@@ -1,0 +1,82 @@
+asyncapi: 2.6.0
+info:
+  title: UmuravaLens WebSocket API
+  version: 1.0.0
+  description: |
+    Real-time notification system for UmuravaLens using Socket.io. 
+    This service manages live progress updates for AI screenings and final completion alerts.
+
+servers:
+  production:
+    url: localhost:8085
+    protocol: socket.io
+    description: Notification Service WebSocket Server
+
+channels:
+  screening_progress:
+    subscribe:
+      summary: Subscribe to real-time screening percentage and status updates.
+      message:
+        $ref: '#/components/messages/ScreeningProgress'
+
+  screening_finished:
+    subscribe:
+      summary: Subscribe to the final completion alert and summary stats of a screening.
+      message:
+        $ref: '#/components/messages/ScreeningFinished'
+
+components:
+  messages:
+    ScreeningProgress:
+      name: ScreeningProgress
+      title: Screening Progress Update
+      payload:
+        type: object
+        properties:
+          screeningId:
+            type: string
+            format: uuid
+          jobId:
+            type: string
+          jobName:
+            type: string
+          finished:
+            type: integer
+            description: Number of applicants processed so far.
+          total:
+            type: integer
+            description: Total number of applicants to be screened.
+          percentage:
+            type: integer
+            minimum: 0
+            maximum: 100
+        required: [screeningId, jobId, finished, total, percentage]
+
+    ScreeningFinished:
+      name: ScreeningFinished
+      title: Screening Finished Alert
+      payload:
+        type: object
+        properties:
+          screeningId:
+            type: string
+          jobId:
+            type: string
+          jobName:
+            type: string
+          recruiterEmail:
+            type: string
+            format: email
+          sendEmail:
+            type: boolean
+            description: Whether a confirmation email was also sent to the recruiter.
+          stats:
+            type: object
+            properties:
+              totalApplicants:
+                type: integer
+              shortlistedCount:
+                type: integer
+              topScore:
+                type: number
+        required: [screeningId, jobId, stats]

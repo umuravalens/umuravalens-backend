@@ -74,6 +74,7 @@ export interface ApplicantDocument {
   name: string;
   email: string;
   phoneNumber: string;
+  dateOfBirth?: string;
   profileData: ApplicantProfileData;
   resumeUrl: string;
   documents: ApplicantDocumentAttachment[];
@@ -82,7 +83,7 @@ export interface ApplicantDocument {
     explanation: {
       strengths: string[];
       gaps: string[];
-      recommendation: string;
+      comment: string;
     };
     rank: number;
   };
@@ -102,6 +103,7 @@ const applicantSchema = new Schema<ApplicantDocument>(
     name: { type: String, required: true },
     email: { type: String, required: true },
     phoneNumber: { type: String },
+    dateOfBirth: { type: String },
     profileData: {
       basicInfo: {
         firstName: String,
@@ -174,7 +176,7 @@ const applicantSchema = new Schema<ApplicantDocument>(
       explanation: {
         strengths: [String],
         gaps: [String],
-        recommendation: String
+        comment: String
       },
       rank: Number
     }

@@ -12,7 +12,8 @@ import {
   resendVerification,
   resetPassword,
   updateProfile,
-  verifyEmail
+  verifyEmail,
+  getUserInternal
 } from "../controllers/authController";
 import { authenticate } from "../middlewares/auth";
 
@@ -31,5 +32,6 @@ router.patch("/me", authenticate, updateProfile);
 router.patch("/change-password", authenticate, changePassword);
 router.post("/logout", authenticate, logout);
 router.post("/logout-all", authenticate, logoutAll);
+router.get("/internal/users/:id", getUserInternal);
 
 export default router;

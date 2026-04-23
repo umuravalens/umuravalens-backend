@@ -7,7 +7,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
       title: "UmuravaLens API Gateway",
       version: "1.1.0",
       description:
-        "Production-oriented API docs for authentication, recruitment workflow, and dashboard endpoints. \n\n **[View Raw JSON API Specification](/api/v3)** \n\n **Public job and application routes** (`/public/jobs/...`, applicant uploads under `/uploads/...`) do **not** require a JWT; omit `Authorization` for those calls. In Swagger UI, operations with `security: []` ignore the global Authorize token."
+        "Production-oriented API docs for authentication, recruitment workflow, and dashboard endpoints. \n\n **[View Raw JSON API Specification](/api/v3)** \n\n **[WebSocket Documentation (AsyncAPI)](/docs/asyncapi)** \n\n **Public job and application routes** (`/public/jobs/...`, applicant uploads under `/uploads/...`) do **not** require a JWT; omit `Authorization` for those calls. In Swagger UI, operations with `security: []` ignore the global Authorize token."
     },
     servers: [{ url: "http://localhost:8080", description: "Local gateway" }],
     tags: [
@@ -97,6 +97,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
             },
             location: { type: "string", example: "Kigali, Rwanda" },
             employmentType: { type: "string", example: "Full-time" },
+            shortlist: { type: "number", example: 75 },
             createdAt: { type: "string", format: "date-time" }
           }
         },
@@ -107,6 +108,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
             name: { type: "string", example: "Jane Smith" },
             email: { type: "string", example: "jane.smith@example.com" },
             phoneNumber: { type: "string", example: "+250780000000" },
+            dateOfBirth: { type: "string", example: "1995-05-15" },
             status: { type: "string", enum: ["draft", "pending", "shortlisted", "rejected"], example: "pending" },
             jobId: { type: "string", example: "60d0fe4f5311236168a109cb" },
             profileData: {
@@ -154,7 +156,14 @@ const swaggerOptions: swaggerJsdoc.Options = {
               properties: {
                 matchScore: { type: "number", example: 85 },
                 rank: { type: "number", example: 1 },
-                explanation: { type: "string" }
+                explanation: {
+                  type: "object",
+                  properties: {
+                    strengths: { type: "array", items: { type: "string" } },
+                    gaps: { type: "array", items: { type: "string" } },
+                    comment: { type: "string" }
+                  }
+                }
               }
             },
             createdAt: { type: "string", format: "date-time" }
@@ -165,7 +174,14 @@ const swaggerOptions: swaggerJsdoc.Options = {
           properties: {
             id: { type: "string" },
             jobId: { type: "string" },
-            status: { type: "string", enum: ["pending", "processing", "completed", "failed"] },
+            status: { type: "string", enum: ["pending", "processing", "completed", "failed", "stopped"] },
+            progress: {
+              type: "object",
+              properties: {
+                finished: { type: "number" },
+                total: { type: "number" }
+              }
+            },
             stats: {
               type: "object",
               properties: {
@@ -1293,6 +1309,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
           security: [{ bearerAuth: [] }],
           parameters: [
             { in: "query", name: "jobId", schema: { type: "string" } },
+            { in: "query", name: "source", schema: { type: "string" }, description: "Filter by application source code" },
+            { in: "query", name: "needsVerification", schema: { type: "boolean" }, description: "Filter applicants with unverified additional documents" },
             { in: "query", name: "page", schema: { type: "integer", minimum: 1, default: 1 } },
             { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
           ],
@@ -1605,7 +1623,13 @@ const swaggerOptions: swaggerJsdoc.Options = {
                             properties: {
                               id: { type: "string" },
                               status: { type: "string" },
-                              progress: { type: "number" },
+                              progress: { 
+                                type: "object",
+                                properties: {
+                                  finished: { type: "number" },
+                                  total: { type: "number" }
+                                }
+                              },
                               updatedAt: { type: "string", format: "date-time" }
                             }
                           }
@@ -1616,6 +1640,24 @@ const swaggerOptions: swaggerJsdoc.Options = {
                 }
               }
             }
+          }
+        },
+        post: {
+          tags: ["Screening Service"],
+          summary: "Stop a running screening",
+          security: [{ bearerAuth: [] }],
+          parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": { description: "Screening stopped" }
+          }
+        },
+        delete: {
+          tags: ["Screening Service"],
+          summary: "Delete a screening record",
+          security: [{ bearerAuth: [] }],
+          parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": { description: "Screening deleted" }
           }
         }
       },

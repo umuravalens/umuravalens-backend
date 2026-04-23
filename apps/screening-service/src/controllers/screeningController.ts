@@ -27,10 +27,17 @@ export const runScreening = async (req: Request, res: Response, next: NextFuncti
       throw new AppError("jobId is required", 400);
     }
 
+    // Ensure only one active screening per job
+    const activeResult = await Screening.findOne({ jobId, status: { $in: ["pending", "processing"] } });
+    if (activeResult) {
+      throw new AppError("A screening is already running for this job", 400);
+    }
+
     const screening = await Screening.create({ 
         jobId, 
         recruiterId, 
         status: "pending", 
+        progress: { finished: 0, total: 0 },
         stats: { totalApplicants: 0, shortlistedCount: 0, topScore: 0 }
     });
     await screeningQueue.add("run-screening", { screeningId: screening.id, jobId });
@@ -39,6 +46,36 @@ export const runScreening = async (req: Request, res: Response, next: NextFuncti
   } catch (error) {
     next(error);
   }
+};
+
+export const stopScreening = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const recruiterId = getUserId(req);
+      const screening = await Screening.findOneAndUpdate(
+        { _id: req.params.id, recruiterId, status: { $in: ["pending", "processing"] } },
+        { status: "stopped" },
+        { new: true }
+      );
+      if (!screening) {
+        throw new AppError("Active screening not found or already stopped/completed", 404);
+      }
+      res.json(ok(screening));
+    } catch (error) {
+      next(error);
+    }
+};
+
+export const deleteScreening = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const recruiterId = getUserId(req);
+      const screening = await Screening.findOneAndDelete({ _id: req.params.id, recruiterId });
+      if (!screening) {
+        throw new AppError("Screening not found", 404);
+      }
+      res.json(ok({ deleted: true }));
+    } catch (error) {
+      next(error);
+    }
 };
 
 export const listScreenings = async (req: Request, res: Response, next: NextFunction) => {

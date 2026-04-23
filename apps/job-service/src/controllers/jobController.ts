@@ -54,7 +54,6 @@ export const createJob = async (req: Request, res: Response, next: NextFunction)
       sources,
       requirements,
       status,
-      threshold,
       shortlist,
       requiredDocuments
     } = req.body;
@@ -78,7 +77,6 @@ export const createJob = async (req: Request, res: Response, next: NextFunction)
       sources: jobSources,
       requirements: normalizedRequirements,
       status: status || "draft",
-      threshold: Number(threshold) || 0,
       shortlist: Number(shortlist) || 0,
       requiredDocuments: Array.isArray(requiredDocuments) ? requiredDocuments : []
     });

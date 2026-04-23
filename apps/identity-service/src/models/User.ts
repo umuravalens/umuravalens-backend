@@ -18,6 +18,9 @@ export interface UserDocument {
   resetPasswordTokenHash?: string;
   resetPasswordExpiresAt?: Date;
   refreshTokenVersion: number;
+  notifications: {
+    emailOnScreeningDone: boolean;
+  };
   createdAt?: Date;
 }
 
@@ -39,7 +42,10 @@ const userSchema = new Schema<UserDocument>(
     emailVerificationTokenHash: { type: String },
     resetPasswordTokenHash: { type: String },
     resetPasswordExpiresAt: { type: Date },
-    refreshTokenVersion: { type: Number, default: 0 }
+    refreshTokenVersion: { type: Number, default: 0 },
+    notifications: {
+      emailOnScreeningDone: { type: Boolean, default: true }
+    }
   },
   { timestamps: true }
 );

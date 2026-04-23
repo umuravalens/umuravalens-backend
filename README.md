@@ -1,210 +1,133 @@
 # UmuravaLens Backend
 
-Production-ready microservices backend for the UmuravaLens recruitment platform, implemented with Node.js, TypeScript, Express, MongoDB, Redis/BullMQ, JWT authentication, and Socket.io notifications.
+UmuravaLens is a state-of-the-art recruitment platform backend built on a **microservices architecture**. It leverages **Generative AI (Gemini 2.5 Flash)** to automate applicant screening, resume parsing, and multimodal document verification with real-time observability.
 
-## Features
+---
 
-- Microservices architecture with API Gateway
-- Authentication with bcrypt + JWT (Identity Service)
-- Jobs and applicants management
-- **AI-Powered Resume Analysis** (Gemini AI integration)
-- Screening workflow with queue-driven processing
-- Deterministic applicant ranking (skills + experience)
-- Real-time screening status updates via Socket.io
-- Shared packages for consistent types and utilities
-- Dockerized deployment with `docker-compose`
-- Source-first monorepo architecture for high-speed development
+## 🛠 Tech Stack
 
-## Services
+- **Runtime**: Node.js & TypeScript
+- **Framework**: Express.js
+- **Microservices**: Monorepo orchestration via NPM Workspaces
+- **Databases**: MongoDB (Per-service isolation)
+- **Messaging**: Redis + BullMQ (Asynchronous Task Processing)
+- **AI Engine**: Google Gemini 2.5 Flash (Multimodal)
+- **Communication**: REST (HTTP/JSON), WebSockets (Socket.io)
+- **API Documentation**: OpenAPI (Swagger) & AsyncAPI (WebSockets)
+- **DevOps**: Docker, Docker Compose
 
-- `api-gateway` - Entry point and routing/proxy layer
-- `identity-service` - User accounts, profile, and candidate source management
-- `job-service` - CRUD for jobs
-- `applicant-service` - AI resume analysis, applications intake, and candidate verification
-- `screening-service` - Screening orchestration and status/results APIs
-- `worker-service` - BullMQ consumer for screening processing
-- `notification-service` - Socket.io event broadcasting and internal event ingestion
+---
 
-## Architecture
+## 🏗 System Architecture
 
-```text
-Client
-  -> API Gateway
-      -> Auth Service
-      -> Job Service
-      -> Applicant Service
-      -> Screening Service -> Redis/BullMQ -> Worker Service
-                                               -> Job Service
-                                               -> Applicant Service
-                                               -> Notification Service (HTTP /events)
-                                                        -> Socket.io clients
+UmuravaLens follows a strictly decoupled microservices pattern:
 
-MongoDB stores domain data per service DB.
+```mermaid
+graph TD
+    Gateway[API Gateway :8080] --> Identity[Identity Service :8081]
+    Gateway --> Jobs[Job Service :8082]
+    Gateway --> Applicants[Applicant Service :8083]
+    Gateway --> Screening[Screening Service :8084]
+    
+    Screening -- Enqueue Task --> Redis[(Redis Queue)]
+    Redis -- Process --> Worker[Screening Worker]
+    
+    Worker -- Fetch Data --> Applicants
+    Worker -- Analysis --> Gemini[Gemini 2.5 AI]
+    Worker -- Broadcast --> Notify[Notification Service :8085]
+    
+    Notify -- Emit Events --> Client((Frontend / Socket.io))
 ```
 
-## Data Model
+---
 
-### User
-- `name`
-- `email`
-- `passwordHash`
+## 🤖 AI Screening Pipeline
 
-### Job
-- `title`
-- `description`
-- `requirements.skills[]`
-- `requirements.experience`
+The core "engine" of UmuravaLens is its automated, multimodal screening pipeline.
 
-### Applicant
-- `jobId`
-- `name`
-- `email`
-- `skills[]`
-- `experienceYears`
-- `resumeUrl`
+### 1. Data Aggregation
+The pipeline aggregates a "360-degree" view of the candidate:
+- **Core Profile**: Extracted skills, bio, and experience timeline.
+- **Multimodal Assets**: Binary files like Portfolios (PDF/Images), Project Samples, and Certifications.
+- **Job Context**: The specific requirements and the recruiter-defined `shortlist` threshold.
 
-### Screening
-- `jobId`
-- `status` (`pending`, `processing`, `completed`)
-- `results[]` (`applicantId`, `rank`, `score`, `notes`)
+### 2. Analysis Flow
+- **Worker Execution**: Background tasks are processed with a **5-attempt Exponential Backoff** retry policy to ensure 99.9% availability.
+- **multimodal Reasoning**: Gemini analyzes visual evidence (e.g., UI designs in a portfolio) alongside textual claims.
+- **Scoring**: A match score (0-100) is generated based on core tech stack alignment and experience depth.
+- **Commentary**: AI generates a strictly monitored **200-300 word professional analysis** justifying its decision.
 
-## Queue
+### 3. Real-time Monitoring
+Recruiters can watch the analysis happen live. The **Notification Service** emits:
+- `screening_progress`: percentage, finished/total counts, and current job status.
+- `screening_finished`: Final results summary and confirmation of the automated recruiter email.
 
-- Redis + BullMQ
-- Queue name: `screening-queue`
-- Retry policy: 3 attempts
-- Worker simulates processing and computes ranking
+---
 
-## Real-time Events
+## 📡 API & Documentation
 
-Notification service emits:
-- `screening_started`
-- `screening_processing`
-- `screening_completed`
+| Source | Documentation URL | Description |
+| :--- | :--- | :--- |
+| **REST API** | `http://localhost:8080/docs` | Interactive Swagger UI for all recruitment and identity routes. |
+| **WebSockets** | `http://localhost:8080/docs/asyncapi` | Interactive AsyncAPI UI for real-time event schemas. |
+| **Raw JSON** | `http://localhost:8080/api/v3` | Raw OpenAPI v3 specification. |
 
-Socket endpoint: `ws://localhost:8085`
+### Core Endpoints
 
-## API Documentation
+#### 🔐 Identity & Auth
+- `POST /auth/login` | Recruiter authentication.
+- `GET /auth/me` | Fetch authenticated user with notification preferences.
+- `GET /sources` | Manage candidate traffic sources (LinkedIn, Job Boards, etc.).
 
-All external calls go through API Gateway (`http://localhost:8080`).
-Interactive Swagger UI is available at `http://localhost:8080/docs`.
+#### 💼 Jobs
+- `POST /jobs` | Create vacancy with mandatory skills and shortlist threshold.
+- `POST /jobs/:id/publish` | Switch job from Draft to Published status.
 
-### Identity
-- `POST /identity/login` - Local authentication
-- `POST /identity/google` - Social authentication (OAuth 2.0)
-- `POST /identity/refresh-token`
-- `POST /identity/forgot-password`
-- `POST /identity/reset-password`
-- `GET /identity/me` (Bearer token required)
-- `PATCH /identity/me` (Update profiles)
-- `PATCH /identity/change-password`
-- `POST /identity/logout` 
-- `POST /identity/logout-all`
-- `GET /sources` - List candidate traffic sources (Bearer token required)
-- `POST /sources` - Add new source code (e.g. LINKEDIN)
+#### 📄 Applicants
+- `POST /applicants/apply` | Primary endpoint for candidate applications + file uploads.
+- `GET /applicants?jobId=...` | List and filter applicants by job, source, or verification status.
+- `POST /applicants/verify/:id` | Human-in-the-loop verification of candidate data.
 
-### Jobs
-- `POST /jobs` (Bearer token required)
-- `GET /jobs` (Bearer token required, recruiter-owned jobs only)
-- `GET /jobs/:id` (Bearer token required, recruiter-owned job only)
-- `PATCH /jobs/:id` (Bearer token required)
-- `DELETE /jobs/:id` (Bearer token required)
-- `POST /jobs/:id/publish` (Bearer token required; sets job to published)
-- `GET /public/jobs/:publicId` (public job details for applicants)
+#### 📊 Screening
+- `POST /screenings/run` | Trigger AI analysis for a job's entire applicant pool.
+- `POST /screenings/:id/stop` | Immediate halt of a running analysis task.
+- `GET /screenings/:id/results` | Detailed AI report with match scores and commentary.
 
-### Applicants
-- `POST /applicants/analyze` - AI Resume parsing (Multipart PDF; Bearer token required)
-- `POST /applicants/apply` - Submit standard application (JSON; Bearer token required)
-- `POST /applicants/verify/:applicantId` - Verify candidate (Bearer token required)
-- `POST /applicants` (Manual creation; Bearer token required)
-- `GET /applicants` (Bearer token required, optional query: `jobId`)
-- `POST /public/jobs/:publicId/apply` (public application: multipart fields + optional `files`; no auth)
-- `GET /uploads/:filename` (serve uploaded file; use `documents[].fileUrl` from applicant responses; no auth)
-- `GET /applicants/:jobId` (Bearer token required)
-- `GET /applicant-items/:id` (Bearer token required)
-- `PATCH /applicant-items/:id` (Bearer token required)
-- `DELETE /applicant-items/:id` (Bearer token required)
+---
 
-### Screening
-- `POST /screenings/run` (Bearer token required; body: `{ "jobId": "..." }`)
-- `GET /screenings` (Bearer token required; optional query: `jobId`, `status`)
-- `GET /screenings/:id/status` (Bearer token required)
-- `GET /screenings/:id/results` (Bearer token required)
+## 🚀 Getting Started
 
-### Dashboard
-- `GET /dashboard/overview` (Bearer token required)
+### Prerequisites
+- Docker & Docker Compose
+- Node.js (v20+)
+- Google Gemini API Key
 
-## Standard Response Format
+### Installation
 
-Every API responds using:
+1. **Clone & Config**:
+   ```bash
+   cp .env.example .env
+   # Add your GEMINI_API_KEY to the .env
+   ```
 
-```json
-{
-  "success": true,
-  "data": {},
-  "error": null
-}
-```
+2. **Launch with Docker**:
+   ```bash
+   docker-compose up --build
+   ```
 
-Error shape:
+3. **Local Dev Mode**:
+   ```bash
+   npm install
+   # Run all microservices concurrently
+   npm run dev
+   ```
 
-```json
-{
-  "success": false,
-  "data": null,
-  "error": "message"
-}
-```
+---
 
-## Setup
+## 🔒 Security & Performance
 
-### 1) Create environment file
- 
-Copy the sample config to the root directory:
- 
-```bash
-cp .env.example .env
-```
- 
-(Windows PowerShell)
- 
-```powershell
-Copy-Item .env.example .env
-```
-*Note: A single `.env` at the root now configures all microservices.*
+- **Service Isolation**: Each service has its own MongoDB instance to prevent cross-service database coupling.
+- **Gateway Validation**: Strict file type filtering (PDF, PNG, JPEG, WebP, HEIC) enforced at the entry point.
+- **Rate Limiting**: AI prompts are protected by internal queuing to prevent API throttling.
+- **Centralized Logging**: Unified Winston-based logging across all seven microservices.
 
-### 2) Run with Docker Compose
-
-```bash
-docker-compose up --build
-```
-
-This starts:
-- MongoDB
-- Redis
-- All seven services
-
-### 3) Health checks
-
-- Gateway: `GET http://localhost:8080/health`
-- Auth: `GET http://localhost:8081/health`
-- Jobs: `GET http://localhost:8082/health`
-- Applicants: `GET http://localhost:8083/health`
-- Screening: `GET http://localhost:8084/health`
-- Notifications: `GET http://localhost:8085/health`
-
-## Local Development (without Docker)
- 
-```bash
-npm install
-npm run dev
-```
- 
-Make sure MongoDB and Redis are available. The project uses `tsx watch --env-file .env` for high-speed hot-reloading across the entire monorepo.
-
-## Notes
-
-- **AI Integration**: Google Gemini AI is integrated for automated resume parsing in the `applicant-service`.
-- **Monorepo Architecture**: Uses NPM Workspaces. Shared packages (`shared-types`, `shared-utils`) are consumed directly from source during development.
-- **Logging**: Implemented with Winston via `@umurava/shared-utils`, including full error stack serialization.
-- **Global error handlers**: Implemented in each API service and the Gateway.

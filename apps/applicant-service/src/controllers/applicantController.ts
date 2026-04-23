@@ -306,9 +306,15 @@ export const listApplicants = async (req: Request, res: Response, next: NextFunc
   try {
     const recruiterId = getRecruiterId(req);
     const { page, limit, skip } = getPagination(req);
-    const query: any = { status: { $ne: "draft" } }; // Typically recruiter only sees non-drafts
+    const query: any = { status: { $ne: "draft" } }; 
     if (req.query.jobId) {
       query.jobId = String(req.query.jobId);
+    }
+    if (req.query.source) {
+      query.application_source = String(req.query.source);
+    }
+    if (req.query.needsVerification === "true") {
+      query.documents = { $elemMatch: { isAdditional: true, isVerified: false } };
     }
 
     const [applicants, total] = await Promise.all([

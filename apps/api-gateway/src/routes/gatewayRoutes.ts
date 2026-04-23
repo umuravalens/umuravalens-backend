@@ -17,28 +17,17 @@ const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
     const allowedTypes = [
-      // Documents
       "application/pdf",
-      "application/msword", // .doc
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-      "application/vnd.ms-excel", // .xls
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-      "application/vnd.ms-powerpoint", // .ppt
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
-      "text/plain", // .txt
-
-      // Images
       "image/png",
-      "image/jpeg", // Covers .jpg and .jpeg
-      "image/gif",
+      "image/jpeg",
       "image/webp",
-      "image/svg+xml",
-      "image/bmp"
+      "image/heic",
+      "image/heif"
     ];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Invalid file type. Only PDF, DOCX, PNG, and JPG are allowed."));
+      cb(new Error("Invalid file type. Only PDF, PNG, JPG, WebP, and HEIC/HEIF are allowed."));
     }
   }
 });
