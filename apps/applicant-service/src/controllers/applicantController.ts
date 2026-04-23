@@ -130,35 +130,35 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
     // Verify Source
     const sourceExists = job.sources.some((s: any) => s.code === source_code);
     if (!sourceExists) {
-        throw new AppError("Invalid source code for this job", 400);
+      throw new AppError("Invalid source code for this job", 400);
     }
 
     // Document Validation
     const requiredDocs = job.requiredDocuments || [];
     const uploadedFiles = (req.files as Express.Multer.File[]) || [];
     const providedDocNames = [
-        ...(otherDocsJson || []).map((d: any) => d.documentName),
-        ...uploadedFiles.map(f => f.originalname.includes("Resume") ? "Resume" : "Other")
+      ...(otherDocsJson || []).map((d: any) => d.documentName),
+      ...uploadedFiles.map(f => f.originalname.includes("Resume") ? "Resume" : "Other")
     ].filter(Boolean);
 
     for (const reqDoc of requiredDocs) {
-        if (reqDoc.isRequired && !providedDocNames.includes(reqDoc.documentType)) {
-            throw new AppError(`Missing required document: ${reqDoc.documentType}`, 400);
-        }
+      if (reqDoc.isRequired && !providedDocNames.includes(reqDoc.documentType)) {
+        throw new AppError(`Missing required document: ${reqDoc.documentType}`, 400);
+      }
     }
 
     // Check if extra documents are allowed (if they match required types or we allow any)
     const validDocTypes = requiredDocs.map((rd: any) => rd.documentType);
     for (const docName of providedDocNames) {
-        if (!validDocTypes.includes(docName)) {
-            throw new AppError(`Document type ${docName} is not required/allowed for this job`, 400);
-        }
+      if (!validDocTypes.includes(docName)) {
+        throw new AppError(`Document type ${docName} is not required/allowed for this job`, 400);
+      }
     }
 
     const docList: ApplicantDocumentAttachment[] = (otherDocsJson || []).map((d: any) => ({
-        ...d,
-        uploadDate: new Date(),
-        fileUrl: `/uploads/${d.storedFileName}`
+      ...d,
+      uploadDate: new Date(),
+      fileUrl: `/uploads/${d.storedFileName}`
     }));
 
     for (const file of uploadedFiles) {
@@ -194,69 +194,69 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
 };
 
 export const verifyApplicant = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        const { applicantId } = req.params;
-        const rawBody = req.body as Record<string, unknown>;
-        const updatedData = typeof rawBody.profileData === 'string' ? JSON.parse(rawBody.profileData) : rawBody;
-        // In verify, we might receive the whole object or just profileData. Handle both.
-        const profileData = updatedData.profileData || updatedData;
+  try {
+    const { applicantId } = req.params;
+    const rawBody = req.body as Record<string, unknown>;
+    const updatedData = typeof rawBody.profileData === 'string' ? JSON.parse(rawBody.profileData) : rawBody;
+    // In verify, we might receive the whole object or just profileData. Handle both.
+    const profileData = updatedData.profileData || updatedData;
 
-        const applicant = await Applicant.findById(applicantId);
-        if (!applicant) {
-            throw new AppError("Applicant not found", 404);
-        }
-
-        if (applicant.status !== "draft") {
-            throw new AppError("Only draft applications can be verified", 400);
-        }
-
-        // Check for changes - Simple comparison of email for now as per instructions "if the response comes as it was without any changes"
-        // Instruction: "if the response comes as it was without any changes... change status to pending... if there is a change return the user with the draft response still"
-        // We'll compare some key fields or the whole object.
-        const isModified = JSON.stringify(updatedData.profileData) !== JSON.stringify(applicant.profileData);
-
-        if (isModified) {
-            // Update the draft and return it
-            applicant.profileData = profileData;
-            if (updatedData.name) applicant.name = updatedData.name;
-            if (updatedData.email) applicant.email = updatedData.email;
-            if (updatedData.phoneNumber) applicant.phoneNumber = updatedData.phoneNumber;
-
-            // Handle new files in verify step
-            const uploadedFiles = (req.files as Express.Multer.File[]) || [];
-            for (const file of uploadedFiles) {
-              applicant.documents.push({
-                documentName: file.originalname.includes("Resume") ? "Resume" : "Other",
-                originalFileName: file.originalname,
-                storedFileName: file.filename,
-                uploadDate: new Date(),
-                fileUrl: `/uploads/${file.filename}`
-              });
-            }
-
-            await applicant.save();
-            return res.json(ok(serializeApplicant(applicant)));
-        }
-
-        // No changes, proceed to pending
-        // Check for existing application with same email and specific statuses
-        const existing = await Applicant.findOne({
-            email: applicant.email,
-            status: { $in: ["pending", "shortlisted", "rejected"] },
-            jobId: applicant.jobId
-        });
-
-        if (existing) {
-            throw new AppError("An application with this email already exists for this job", 400);
-        }
-
-        applicant.status = "pending";
-        await applicant.save();
-
-        res.json(ok(serializeApplicant(applicant)));
-    } catch (error) {
-        next(error);
+    const applicant = await Applicant.findById(applicantId);
+    if (!applicant) {
+      throw new AppError("Applicant not found", 404);
     }
+
+    if (applicant.status !== "draft") {
+      throw new AppError("Only draft applications can be verified", 400);
+    }
+
+    // Check for changes - Simple comparison of email for now as per instructions "if the response comes as it was without any changes"
+    // Instruction: "if the response comes as it was without any changes... change status to pending... if there is a change return the user with the draft response still"
+    // We'll compare some key fields or the whole object.
+    const isModified = JSON.stringify(updatedData.profileData) !== JSON.stringify(applicant.profileData);
+
+    if (isModified) {
+      // Update the draft and return it
+      applicant.profileData = profileData;
+      if (updatedData.name) applicant.name = updatedData.name;
+      if (updatedData.email) applicant.email = updatedData.email;
+      if (updatedData.phoneNumber) applicant.phoneNumber = updatedData.phoneNumber;
+
+      // Handle new files in verify step
+      const uploadedFiles = (req.files as Express.Multer.File[]) || [];
+      for (const file of uploadedFiles) {
+        applicant.documents.push({
+          documentName: file.originalname.includes("Resume") ? "Resume" : "Other",
+          originalFileName: file.originalname,
+          storedFileName: file.filename,
+          uploadDate: new Date(),
+          fileUrl: `/uploads/${file.filename}`
+        });
+      }
+
+      await applicant.save();
+      return res.json(ok(serializeApplicant(applicant)));
+    }
+
+    // No changes, proceed to pending
+    // Check for existing application with same email and specific statuses
+    const existing = await Applicant.findOne({
+      email: applicant.email,
+      status: { $in: ["pending", "shortlisted", "rejected"] },
+      jobId: applicant.jobId
+    });
+
+    if (existing) {
+      throw new AppError("An application with this email already exists for this job", 400);
+    }
+
+    applicant.status = "pending";
+    await applicant.save();
+
+    res.json(ok(serializeApplicant(applicant)));
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const listApplicants = async (req: Request, res: Response, next: NextFunction) => {
