@@ -27,6 +27,7 @@ export interface JobDocument {
   shortlist: number;
   requiredDocuments: RequiredDocument[];
   unverifiedFilesCount: number;
+  applicantCount: number;
   publicId: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -63,6 +64,7 @@ const jobSchema = new Schema<JobDocument>(
       }
     ],
     unverifiedFilesCount: { type: Number, default: 0 },
+    applicantCount: { type: Number, default: 0 },
     publicId: { type: String, unique: true, index: true }
   },
   { timestamps: true }

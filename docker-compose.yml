@@ -25,6 +25,7 @@ services:
     env_file: .env
     environment:
       IDENTITY_SERVICE_PORT: ${IDENTITY_SERVICE_PORT}
+      AUTH_SERVICE_PORT: ${IDENTITY_SERVICE_PORT}
       IDENTITY_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/identitydb?authSource=admin
       AUTH_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/identitydb?authSource=admin
       JWT_SECRET: ${JWT_SECRET}
@@ -58,6 +59,7 @@ services:
       JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL}
+      REDIS_URL: redis://redis:6379
     volumes:
       # Same files on your PC as inside the container (Windows: under your repo path)
       - ./apps/applicant-service/src/uploads:/app/apps/applicant-service/src/uploads
@@ -84,6 +86,7 @@ services:
       dockerfile: apps/worker-service/Dockerfile
     env_file: .env
     environment:
+      WORKER_SERVICE_PORT: ${WORKER_SERVICE_PORT}
       SCREENING_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/screeningdb?authSource=admin
       REDIS_URL: redis://redis:6379
       JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}

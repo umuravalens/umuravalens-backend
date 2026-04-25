@@ -25,6 +25,12 @@ channels:
       message:
         $ref: '#/components/messages/ScreeningFinished'
 
+  screening_failed:
+    subscribe:
+      summary: Subscribe to failure alerts when a screening process encounters a critical error.
+      message:
+        $ref: '#/components/messages/ScreeningFailed'
+
 components:
   messages:
     ScreeningProgress:
@@ -80,3 +86,18 @@ components:
               topScore:
                 type: number
         required: [screeningId, jobId, stats]
+
+    ScreeningFailed:
+      name: ScreeningFailed
+      title: Screening Failure Alert
+      payload:
+        type: object
+        properties:
+          screeningId:
+            type: string
+          jobId:
+            type: string
+          error:
+            type: string
+            description: Detailed error message explaining the failure (e.g., "error fetching applicants").
+        required: [screeningId, jobId, error]

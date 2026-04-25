@@ -1,4 +1,5 @@
 import swaggerJsdoc from "swagger-jsdoc";
+import { env } from "./env";
 
 const swaggerOptions: swaggerJsdoc.Options = {
   definition: {
@@ -6,16 +7,43 @@ const swaggerOptions: swaggerJsdoc.Options = {
     info: {
       title: "UmuravaLens API Gateway",
       version: "1.1.0",
-      description:
-        "Production-oriented API docs for authentication, recruitment workflow, and dashboard endpoints. \n\n **[View Raw JSON API Specification](/api/v3)** \n\n **[WebSocket Documentation (AsyncAPI)](/docs/asyncapi)** \n\n **Public job and application routes** (`/public/jobs/...`, applicant uploads under `/uploads/...`) do **not** require a JWT; omit `Authorization` for those calls. In Swagger UI, operations with `security: []` ignore the global Authorize token."
+      description: `
+Production-oriented API docs for authentication, recruitment workflow, and dashboard endpoints.
+
+### Running Services
+- **Identity Service**: Authentication, User Management, and Candidate Sources.
+- **Job Service**: Job lifecycle management and vacancy tracking.
+- **Applicant Service**: Resume processing and recruitment workflow.
+- **Screening Service**: AI-driven applicant screening and status.
+- **Notification Service**: Real-time WebSocket alerts and Email notifications.
+- **Worker Service**: Background processing and automated tasks.
+- **API Gateway**: Entry point and service orchestration.
+
+*Check live status for all services at the **[/health](/health)** endpoint.*
+
+---
+**[View Raw JSON API Specification](/api/v3)** | **[WebSocket Documentation (AsyncAPI)](/docs/asyncapi)**
+
+Public job and application routes (\`/public/jobs/...\`, applicant uploads under \`/uploads/...\`) do **not** require a JWT; omit \`Authorization\` for those calls.
+`
     },
-    servers: [{ url: "http://localhost:8080", description: "Local gateway" }],
+    servers: [
+      { url: "/", description: "Current Host (Auto-detected)" },
+      { url: "http://localhost:8080", description: "Local API Gateway (Production Entry)" },
+      { url: env.identityServiceUrl, description: "Identity Service (Internal)" },
+      { url: env.jobServiceUrl, description: "Job Service (Internal)" },
+      { url: env.applicantServiceUrl, description: "Applicant Service (Internal)" },
+      { url: env.screeningServiceUrl, description: "Screening Service (Internal)" },
+      { url: env.notificationServiceUrl, description: "Notification Service (Internal)" },
+      { url: env.workerServiceUrl, description: "Worker Service (Internal Monitoring)" }
+    ],
     tags: [
       { name: "Identity Service", description: "User accounts, authentication, profiles, and candidate source management" },
       { name: "Job Service", description: "Job lifecycle (draft, publish, close) and vacancy management" },
       { name: "Applicant Service", description: "Application intake, recruitment workflow, and resume processing" },
       { name: "Screening Service", description: "AI screening orchestration and status endpoints" },
-      { name: "Dashboard Service", description: "Aggregated analytics endpoints served by the gateway" }
+      { name: "Dashboard Service", description: "Aggregated analytics endpoints served by the gateway" },
+      { name: "System", description: "Infrastructure and health monitoring" }
     ],
     components: {
       securitySchemes: {
@@ -76,6 +104,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
             description: { type: "string", example: "Focus on Node.js and Microservices" },
             status: { type: "string", enum: ["draft", "published", "closed", "archived"], example: "published" },
             unverifiedFilesCount: { type: "number", example: 0 },
+            applicantCount: { type: "number", example: 5 },
             publicId: { type: "string", example: "senior-backend-123" },
             requiredDocuments: {
               type: "array",
@@ -123,20 +152,20 @@ const swaggerOptions: swaggerJsdoc.Options = {
                     location: { type: "string", example: "London, UK" }
                   }
                 },
-                skills: { 
-                  type: "array", 
-                  items: { 
-                    type: "object", 
-                    properties: { 
-                      name: { type: "string", example: "React" }, 
-                      level: { type: "string", example: "Expert" }, 
-                      yearsOfExperience: { type: "number", example: 4 } 
-                    } 
-                  } 
+                skills: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string", example: "React" },
+                      level: { type: "string", example: "Expert" },
+                      yearsOfExperience: { type: "number", example: 4 }
+                    }
+                  }
                 },
-                experience: { 
-                  type: "array", 
-                  items: { 
+                experience: {
+                  type: "array",
+                  items: {
                     type: "object",
                     properties: {
                       company: { type: "string", example: "Tech Corp" },
@@ -145,7 +174,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
                       endDate: { type: "string" },
                       description: { type: "string" }
                     }
-                  } 
+                  }
                 }
               }
             },
@@ -205,6 +234,51 @@ const swaggerOptions: swaggerJsdoc.Options = {
       }
     },
     paths: {
+      "/health": {
+        get: {
+          tags: ["System"],
+          summary: "Consolidated health check",
+          description: "Pings all microservices and reports their current status.",
+          responses: {
+            "200": {
+              description: "Status report",
+              content: {
+                "application/json": {
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/ApiResponse" },
+                      {
+                        type: "object",
+                        properties: {
+                          data: {
+                            type: "object",
+                            properties: {
+                              service: { type: "string", example: "api-gateway" },
+                              status: { type: "string", example: "up" },
+                              dependencies: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    name: { type: "string", example: "identity-service" },
+                                    status: { type: "string", example: "up" },
+                                    details: { type: "object" },
+                                    error: { type: "string", nullable: true }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "/auth/register": {
         post: {
           tags: ["Identity Service"],
@@ -486,8 +560,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Verification email sent",
               content: {
                 "application/json": {
@@ -509,7 +583,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
                   }
                 }
               }
-            } 
+            }
           }
         }
       },
@@ -661,7 +735,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
           summary: "Logout current session",
           security: [{ bearerAuth: [] }],
           responses: {
-            "200": { 
+            "200": {
               description: "Logged out",
               content: {
                 "application/json": {
@@ -692,8 +766,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
           tags: ["Identity Service"],
           summary: "Logout all sessions",
           security: [{ bearerAuth: [] }],
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Logged out all",
               content: {
                 "application/json": {
@@ -764,8 +838,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { 
-            "201": { 
+          responses: {
+            "201": {
               description: "Source created; returns full list",
               content: {
                 "application/json": {
@@ -805,8 +879,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Source updated; returns full list",
               content: {
                 "application/json": {
@@ -833,8 +907,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
           summary: "Delete source",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "code", required: true, schema: { type: "string" } }],
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Deleted; returns full list",
               content: {
                 "application/json": {
@@ -865,8 +939,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
             { in: "path", name: "publicId", required: true, schema: { type: "string" } },
             { in: "path", name: "sourceCode", required: false, schema: { type: "string" }, description: "Optional source tracker. Defaults to platform root if empty." }
           ],
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Public Job Details",
               content: {
                 "application/json": {
@@ -896,8 +970,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
                   }
                 }
               }
-            }, 
-            "403": { description: "Invalid source" } 
+            },
+            "403": { description: "Invalid source" }
           }
         }
       },
@@ -1000,8 +1074,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
               }
             }
           },
-          responses: { 
-            "201": { 
+          responses: {
+            "201": {
               description: "Created",
               content: {
                 "application/json": {
@@ -1058,11 +1132,11 @@ const swaggerOptions: swaggerJsdoc.Options = {
             required: true,
             content: { "application/json": { schema: { $ref: "#/components/schemas/Job" } } }
           },
-          responses: { 
-            "200": { 
-              description: "Updated", 
-              content: { 
-                "application/json": { 
+          responses: {
+            "200": {
+              description: "Updated",
+              content: {
+                "application/json": {
                   schema: {
                     allOf: [
                       { $ref: "#/components/schemas/ApiResponse" },
@@ -1084,8 +1158,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
           summary: "Delete job",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Deleted",
               content: {
                 "application/json": {
@@ -1113,8 +1187,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
           description: "Sets status to **published** so the job appears on `GET /public/jobs/{publicId}` and accepts applications.",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Published; includes publicUrl",
               content: {
                 "application/json": {
@@ -1224,7 +1298,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
         post: {
           tags: ["Applicant Service"],
           summary: "Submit application (Public)",
-          description: "Post-analysis or manual application submission. No authentication required.",
+          description: "One-step application submission. Sets status directly to 'pending'. Supports dynamic field names for documents: any file key sent will be used as the document type (e.g., 'Certification', 'Portfolio'). No authentication required.",
           security: [],
           requestBody: {
             required: true,
@@ -1241,7 +1315,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
                     jobId: { type: "string" },
                     source_code: { type: "string" },
                     otherDocuments: { type: "string", description: "JSON string of existing doc links" },
-                    files: { type: "array", items: { type: "string", format: "binary" }, description: "Additional documents/images" }
+                    "{dynamicDocumentType}": { type: "string", format: "binary", description: "Any key used here will define the document type (e.g. 'ID Card')." }
                   }
                 }
               }
@@ -1249,7 +1323,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
           },
           responses: {
             "201": {
-              description: "Application submitted",
+              description: "Application submitted and set to pending",
               content: {
                 "application/json": {
                   schema: {
@@ -1269,48 +1343,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
           }
         }
       },
-      "/applicants/verify/{applicantId}": {
-        post: {
-          tags: ["Applicant Service"],
-          summary: "Verify applicant credentials (Public)",
-          security: [],
-          parameters: [{ in: "path", name: "applicantId", required: true, schema: { type: "string" } }],
-          requestBody: {
-            required: true,
-            content: {
-              "multipart/form-data": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    applicant: { type: "string", description: "Full Applicant JSON object (name, email, phoneNumber, profileData)" },
-                    files: { type: "array", items: { type: "string", format: "binary" }, description: "Additional docs during verification" }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            "200": {
-              description: "Verified application",
-              content: {
-                "application/json": {
-                  schema: {
-                    allOf: [
-                      { $ref: "#/components/schemas/ApiResponse" },
-                      {
-                        type: "object",
-                        properties: {
-                          data: { $ref: "#/components/schemas/Applicant" }
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
+
       "/applicants": {
         get: {
           tags: ["Applicant Service"],
@@ -1323,8 +1356,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
             { in: "query", name: "page", schema: { type: "integer", minimum: 1, default: 1 } },
             { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
           ],
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Applicants list",
               content: {
                 "application/json": {
@@ -1354,8 +1387,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
           tags: ["Applicant Service"],
           summary: "Create applicant manually",
           security: [{ bearerAuth: [] }],
-          responses: { 
-            "201": { 
+          responses: {
+            "201": {
               description: "Created",
               content: {
                 "application/json": {
@@ -1386,8 +1419,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
             { in: "query", name: "page", schema: { type: "integer", minimum: 1, default: 1 } },
             { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
           ],
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Applicants for job",
               content: {
                 "application/json": {
@@ -1477,8 +1510,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
           summary: "Delete applicant",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Deleted",
               content: {
                 "application/json": {
@@ -1510,7 +1543,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
             { in: "path", name: "storedFileName", required: true, schema: { type: "string" }, description: "The unique stored filename of the document" }
           ],
           responses: {
-            "200": { 
+            "200": {
               description: "Document verified; returns updated applicant object",
               content: {
                 "application/json": {
@@ -1543,8 +1576,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
             { in: "query", name: "page", schema: { type: "integer", minimum: 1, default: 1 } },
             { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
           ],
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Screenings list",
               content: {
                 "application/json": {
@@ -1616,8 +1649,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
           summary: "Get screening status",
           security: [{ bearerAuth: [] }],
           parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
-          responses: { 
-            "200": { 
+          responses: {
+            "200": {
               description: "Screening Status",
               content: {
                 "application/json": {
@@ -1632,7 +1665,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
                             properties: {
                               id: { type: "string" },
                               status: { type: "string" },
-                              progress: { 
+                              progress: {
                                 type: "object",
                                 properties: {
                                   finished: { type: "number" },
@@ -1740,7 +1773,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
                               },
                               pipeline: { type: "object" },
                               breakdowns: { type: "object" },
-                              jobs: { 
+                              jobs: {
                                 type: "object",
                                 properties: {
                                   topByApplicants: { type: "array", items: { type: "object" } },

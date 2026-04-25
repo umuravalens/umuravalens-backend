@@ -8,13 +8,15 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@umurava/shared-types": "file:../../packages/shared-types",
+    "@umurava/shared-utils": "file:../../packages/shared-utils",
+    "bullmq": "^5.76.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "ioredis": "^5.10.1",
     "mongoose": "^8.9.5",
-    "morgan": "^1.10.0",
-    "@umurava/shared-types": "file:../../packages/shared-types",
-    "@umurava/shared-utils": "file:../../packages/shared-utils"
+    "morgan": "^1.10.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",

@@ -1,1 +1,36 @@
-import http from "http";import cors from "cors";import express from "express";import morgan from "morgan";import { Server } from "socket.io";import { logger, ok } from "@umurava/shared-utils";import { env } from "./config/env";import { errorHandler, notFound } from "./middlewares/error";import { buildNotificationRoutes } from "./routes/notificationRoutes";const app=express();const server=http.createServer(app);const io=new Server(server,{cors:{origin:"*"}});app.use(cors());app.use(express.json());app.use(morgan("combined",{stream:{write:(message)=>logger.info({message:message.trim()})}}));io.on("connection",(socket)=>{logger.info({message:"Socket client connected",socketId:socket.id});});app.get("/health",(_req,res)=>res.json(ok({service:"notification-service",status:"up"})));app.use("/",buildNotificationRoutes(io));app.use(notFound);app.use(errorHandler);server.listen(env.port,()=>logger.info({message:`Notification service running on port ${env.port}`}));
+import http from "http";
+import cors from "cors";
+import express from "express";
+import morgan from "morgan";
+import { Server } from "socket.io";
+import { logger, ok } from "@umurava/shared-utils";
+import { env } from "./config/env";
+import { errorHandler, notFound } from "./middlewares/error";
+import { buildNotificationRoutes } from "./routes/notificationRoutes";
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*" } });
+
+app.use(cors());
+app.use(express.json());
+app.use(
+  morgan("combined", {
+    stream: { write: (message) => logger.info({ message: message.trim() }) },
+  })
+);
+
+io.on("connection", (socket) => {
+  logger.info({ message: "Socket client connected", socketId: socket.id });
+});
+
+app.get("/health", (_req, res) => res.json(ok({ service: "notification-service", status: "up" })));
+
+app.use("/notifications", buildNotificationRoutes(io));
+
+app.use(notFound);
+app.use(errorHandler);
+
+server.listen(env.port, () =>
+  logger.info({ message: `Notification service running on port ${env.port}` })
+);

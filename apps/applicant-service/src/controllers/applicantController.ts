@@ -1,6 +1,8 @@
 import axios from "axios";
 import { NextFunction, Request, Response } from "express";
-import { AppError, ok } from "@umurava/shared-utils";
+import fs from "fs";
+import path from "path";
+import { AppError, ok, logger } from "@umurava/shared-utils";
 import { env } from "../config/env";
 import { Applicant, ApplicantDocumentAttachment } from "../models/Applicant";
 import { emitJobMetricsUpdate } from "../utils/queue";
@@ -35,6 +37,17 @@ const parseSkills = (skills: unknown): string[] => {
     : String(skills || "").split(",").map((s) => s.trim());
 
   return parsed.filter(Boolean);
+};
+
+const getDocumentName = (file: Express.Multer.File): string => {
+  let name = file.fieldname;
+  if (!name || name === "files" || name === "file") {
+    // Heuristic fallbacks if the key is generic
+    if (file.originalname.toLowerCase().includes("resume")) return "resume";
+    name = file.originalname.split(".")[0];
+  }
+
+  return name.toLowerCase();
 };
 
 const getRecruiterId = (req: Request): string => {
@@ -137,49 +150,68 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
       throw new AppError("Invalid source code for this job", 400);
     }
 
-    // Document Validation
+    // Document Validation & Deduplication
     const requiredDocs = job.requiredDocuments || [];
     const uploadedFiles = (req.files as Express.Multer.File[]) || [];
-    const providedDocNames = [
-      ...(otherDocsJson || []).map((d: any) => d.documentName),
-      ...uploadedFiles.map(f => f.originalname.includes("Resume") ? "Resume" : "Other")
-    ].filter(Boolean);
+    const dir = path.resolve(env.uploadDir);
+    
+    // Start with documents already provided (e.g. from previous extraction step)
+    // Filter out entries whose files don't actually exist on disk (fallback to upload)
+    const docList: ApplicantDocumentAttachment[] = (otherDocsJson || [])
+      .filter((d: any) => {
+        if (!d.storedFileName || !d.documentName) return false;
+        const exists = fs.existsSync(path.join(dir, d.storedFileName));
+        if (!exists) console.log(`[ApplicantService] Referenced document ${d.documentName} (${d.storedFileName}) missing from disk, will rely on new upload if provided.`);
+        return exists;
+      })
+      .map((d: any) => ({
+        ...d,
+        uploadDate: d.uploadDate ? new Date(String(d.uploadDate)) : new Date(),
+        fileUrl: d.fileUrl || `/uploads/${d.storedFileName}`,
+        isAdditional: d.isAdditional !== undefined ? !!d.isAdditional : !requiredDocs.some((rd: any) => rd.documentType.toLowerCase() === d.documentName.toLowerCase()),
+        isVerified: !!d.isVerified,
+        sendToAI: !!d.sendToAI
+      }));
 
-    for (const reqDoc of requiredDocs) {
-      if (reqDoc.isRequired && !providedDocNames.includes(reqDoc.documentType)) {
-        throw new AppError(`Missing required document: ${reqDoc.documentType}`, 400);
-      }
-    }
-
-    // Check if extra documents are allowed (if they match required types or we allow any)
-    const validDocTypes = requiredDocs.map((rd: any) => rd.documentType);
-    for (const docName of providedDocNames) {
-      if (!validDocTypes.includes(docName)) {
-        throw new AppError(`Document type ${docName} is not required/allowed for this job`, 400);
-      }
-    }
-
-    const docList: ApplicantDocumentAttachment[] = (otherDocsJson || []).map((d: any) => ({
-      ...d,
-      uploadDate: new Date(),
-      fileUrl: `/uploads/${d.storedFileName}`,
-      isAdditional: !!d.isAdditional,
-      isVerified: !!d.isVerified,
-      sendToAI: !!d.sendToAI
-    }));
+    const existingNames = new Set(docList.map(d => d.documentName));
+    console.log(`[ApplicantService] Valid existing documents in request: ${Array.from(existingNames).join(", ")}`);
 
     for (const file of uploadedFiles) {
-      const isReq = requiredDocs.some((rd: any) => rd.documentType === (file.originalname.includes("Resume") ? "Resume" : "Other"));
+      const docName = getDocumentName(file);
+      const isReq = requiredDocs.some((rd: any) => rd.documentType.toLowerCase() === docName.toLowerCase());
+      const storedName = file.filename || file.originalname;
+      
+      // DEDUPLICATION: If we already have a valid document of this type, skip adding it again from binary
+      if (existingNames.has(docName)) {
+        console.log(`[ApplicantService] Skipping redundant binary for document type: ${docName} (File: ${file.originalname})`);
+        const filePath = path.join(dir, storedName);
+        if (fs.existsSync(filePath)) {
+          fs.unlink(filePath, () => {});
+        }
+        continue;
+      }
+
+      const { buffer, ...fileMeta } = file;
+      console.log(`[ApplicantService] Adding newly uploaded file: ${file.originalname} (Document Name: ${docName})`, fileMeta);
+      
       docList.push({
-        documentName: file.originalname.includes("Resume") ? "Resume" : "Other",
+        documentName: docName,
         originalFileName: file.originalname,
-        storedFileName: file.filename,
+        storedFileName: storedName,
         uploadDate: new Date(),
-        fileUrl: `/uploads/${file.filename}`,
+        fileUrl: `/uploads/${storedName}`,
         isAdditional: !isReq,
         isVerified: false,
-        sendToAI: false // Recruiter controlled for additional, job controlled for required
+        sendToAI: false
       });
+      existingNames.add(docName);
+    }
+
+    const providedDocNames = docList.map(d => d.documentName.toLowerCase());
+    for (const reqDoc of requiredDocs) {
+      if (reqDoc.isRequired && !providedDocNames.includes(reqDoc.documentType.toLowerCase())) {
+        throw new AppError(`Missing required document: ${reqDoc.documentType}`, 400);
+      }
     }
 
     const additionalCount = docList.filter(d => d.isAdditional).length;
@@ -187,14 +219,36 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
       throw new AppError("Maximum 3 additional documents allowed", 400);
     }
 
-    const resumeDoc = docList.find(d => d.documentName === 'Resume');
+    const resumeDoc = docList.find(d => d.documentName.toLowerCase() === 'resume');
     const resumeUrl = resumeDoc ? resumeDoc.fileUrl : "";
+    console.log(`[ApplicantService] Final resumeUrl: "${resumeUrl}" (Source doc found: ${!!resumeDoc})`);
+
+    // Check for existing application with same email and specific statuses before creating
+    const existing = await Applicant.findOne({
+      email: verifiedData.email,
+      status: { $in: ["pending", "shortlisted", "rejected"] },
+      jobId: jobId
+    });
+
+    if (existing) {
+      throw new AppError("An application with this email already exists for this job", 400);
+    }
+
+    // Sync AI flags for required documents
+    for (const doc of docList) {
+      if (!doc.isAdditional) {
+        const reqDoc = requiredDocs.find((rd: any) => rd.documentType.toLowerCase() === doc.documentName.toLowerCase());
+        if (reqDoc) {
+          doc.sendToAI = reqDoc.sendToAI;
+        }
+      }
+    }
 
     const applicant = await Applicant.create({
       jobId,
       source: "upload",
       application_source: source_code,
-      status: "draft",
+      status: "pending",
       name: verifiedData.name,
       email: verifiedData.email,
       phoneNumber: verifiedData.phoneNumber,
@@ -203,8 +257,19 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
       documents: docList
     });
 
+    await emitJobMetricsUpdate({ 
+      jobId, 
+      action: "increment", 
+      metric: "applicantCount", 
+      sourceCode: source_code 
+    });
+
     if (additionalCount > 0) {
-      await emitJobMetricsUpdate(jobId, "increment");
+      await emitJobMetricsUpdate({ 
+        jobId, 
+        action: "increment", 
+        metric: "unverifiedFilesCount" 
+      });
     }
 
     res.status(201).json(ok(serializeApplicant(applicant)));
@@ -213,100 +278,13 @@ export const applyApplicant = async (req: Request, res: Response, next: NextFunc
   }
 };
 
-export const verifyApplicant = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { applicantId } = req.params;
-    const rawBody = req.body as Record<string, unknown>;
-    
-    // Accept the whole applicant object or just profileData from verify form
-    const updatedApplicant = typeof rawBody.applicant === 'string' ? JSON.parse(rawBody.applicant) : (rawBody.applicant || rawBody);
-    const profileData = updatedApplicant.profileData;
 
-    const applicant = await Applicant.findById(applicantId);
-    if (!applicant) {
-      throw new AppError("Applicant not found", 404);
-    }
-
-    if (applicant.status !== "draft") {
-      throw new AppError("Only draft applications can be verified", 400);
-    }
-
-    // Check for changes - Simple comparison of email for now as per instructions "if the response comes as it was without any changes"
-    // Instruction: "if the response comes as it was without any changes... change status to pending... if there is a change return the user with the draft response still"
-    // We'll compare some key fields or the whole object.
-    // Check for changes
-    const isModified = JSON.stringify(profileData) !== JSON.stringify(applicant.profileData) || 
-                       updatedApplicant.name !== applicant.name ||
-                       updatedApplicant.email !== applicant.email ||
-                       updatedApplicant.phoneNumber !== applicant.phoneNumber;
-
-    if (isModified) {
-      // Update the draft and return it
-      if (profileData) applicant.profileData = profileData;
-      if (updatedApplicant.name) applicant.name = updatedApplicant.name;
-      if (updatedApplicant.email) applicant.email = updatedApplicant.email;
-      if (updatedApplicant.phoneNumber) applicant.phoneNumber = updatedApplicant.phoneNumber;
-
-      // Handle new files in verify step
-      const uploadedFiles = (req.files as Express.Multer.File[]) || [];
-      for (const file of uploadedFiles) {
-        applicant.documents.push({
-          documentName: file.originalname.includes("Resume") ? "Resume" : "Other",
-          originalFileName: file.originalname,
-          storedFileName: file.filename,
-          uploadDate: new Date(),
-          fileUrl: `/uploads/${file.filename}`,
-          isAdditional: true, // New files in verify step are treated as additional by default
-          isVerified: false,
-          sendToAI: false
-        });
-      }
-
-      await applicant.save();
-      return res.json(ok(serializeApplicant(applicant)));
-    }
-
-    // No changes, proceed to pending
-    // Check for existing application with same email and specific statuses
-    const existing = await Applicant.findOne({
-      email: applicant.email,
-      status: { $in: ["pending", "shortlisted", "rejected"] },
-      jobId: applicant.jobId
-    });
-
-    if (existing) {
-      throw new AppError("An application with this email already exists for this job", 400);
-    }
-
-    // SYNC AI FLAGS based on Job configuration
-    const jobRes = await axios.get(`${env.jobServiceUrl}/jobs/internal/${applicant.jobId}`, { validateStatus: () => true });
-    if (jobRes.status === 200 && jobRes.data?.success) {
-      const job = jobRes.data.data;
-      applicant.documents = applicant.documents.map(doc => {
-        if (!doc.isAdditional) {
-          const reqDoc = job.requiredDocuments.find((rd: any) => rd.documentType === doc.documentName);
-          if (reqDoc) {
-            doc.sendToAI = reqDoc.sendToAI;
-          }
-        }
-        return doc;
-      });
-    }
-
-    applicant.status = "pending";
-    await applicant.save();
-
-    res.json(ok(serializeApplicant(applicant)));
-  } catch (error) {
-    next(error);
-  }
-};
 
 export const listApplicants = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const recruiterId = getRecruiterId(req);
     const { page, limit, skip } = getPagination(req);
-    const query: any = { status: { $ne: "draft" } }; 
+    const query: any = { status: { $ne: "draft" } };
     if (req.query.jobId) {
       query.jobId = String(req.query.jobId);
     }
@@ -364,21 +342,15 @@ export const listApplicantsByJob = async (req: Request, res: Response, next: Nex
 
 export const listApplicantsByJobInternal = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page, limit, skip } = getPagination(req);
-    const query = { jobId: req.params.jobId };
+    const query = { jobId: req.params.jobId, status: { $ne: "draft" } };
     const [applicants, total] = await Promise.all([
-      Applicant.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Applicant.find(query).sort({ createdAt: -1 }),
       Applicant.countDocuments(query)
     ]);
     res.json(
       ok({
         items: applicants,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit)
-        }
+        total
       })
     );
   } catch (error) {
@@ -462,14 +434,18 @@ export const verifyDocument = async (req: Request, res: Response, next: NextFunc
     }
 
     applicant.documents[docIndex].isVerified = true;
-    
+
     // Check if this was the last unverified additional document
     const remainingUnverifiedAdditional = applicant.documents.some(d => d.isAdditional && !d.isVerified);
-    
+
     await applicant.save();
 
     if (!remainingUnverifiedAdditional) {
-      await emitJobMetricsUpdate(applicant.jobId, "decrement");
+      await emitJobMetricsUpdate({
+        jobId: applicant.jobId,
+        action: "decrement",
+        metric: "unverifiedFilesCount"
+      });
     }
 
     res.json(ok(serializeApplicant(applicant)));

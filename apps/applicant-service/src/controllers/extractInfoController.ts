@@ -139,12 +139,14 @@ function fileToGenerativePart(path: string, mimeType: string) {
 
 export const extractInfo = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!req.file) {
+    const file = req.file || (req.files && Array.isArray(req.files) && req.files.length > 0 ? (req.files as Express.Multer.File[])[0] : null);
+    
+    if (!file) {
       throw new AppError("No file uploaded.", 400);
     }
 
     const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-    const pdfPart = fileToGenerativePart(req.file.path, "application/pdf");
+    const pdfPart = fileToGenerativePart(file.path, "application/pdf");
 
     const prompt = `
         You are an advanced talent acquisition AI. Your task is to extract information from the provided resume (PDF) into a strictly structured JSON format.
@@ -172,6 +174,14 @@ export const extractInfo = async (req: Request, res: Response, next: NextFunctio
 
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
+    // Delete the file after it's processed by AI — it should be saved by /apply, not /analyze
+    if (file.path && fs.existsSync(file.path)) {
+      fs.unlink(file.path, (err) => {
+        if (err) console.error(`[extractInfo] Error deleting temp file ${file.path}:`, err);
+        else console.log(`[extractInfo] Deleted temp file: ${file.path}`);
+      });
+    }
+
     try {
       const resultData = JSON.parse(text);
       const missingFields = analyzeMissing(resultData, SCHEMA_TEMPLATE);
@@ -180,9 +190,9 @@ export const extractInfo = async (req: Request, res: Response, next: NextFunctio
         extracted_info: resultData,
         missingFields: missingFields || {},
         tempFile: {
-            filename: req.file.filename,
-            path: req.file.path,
-            originalName: req.file.originalname
+            filename: file.filename,
+            path: file.path,
+            originalName: file.originalname
         }
       }));
     } catch (parseError) {

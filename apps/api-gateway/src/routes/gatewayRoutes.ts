@@ -36,9 +36,8 @@ router.use("/uploads", proxyApplicantUploads);
 
 /** No `authenticate` middleware — candidates and anonymous browsers must access these without JWT. */
 router.get("/jobs/public/:publicId/:sourceCode?", getPublicJobDetails);
-router.post("/applicants/analyze", upload.single("resume"), proxyToApplicants);
-router.post("/applicants/apply", upload.array("files", 10), proxyToApplicants);
-router.post("/applicants/verify/:applicantId", upload.array("files", 10), proxyToApplicants);
+router.post("/applicants/analyze", upload.any(), proxyToApplicants);
+router.post("/applicants/apply", upload.any(), proxyToApplicants);
 
 router.post("/auth/register", proxyToIdentity);
 router.post("/auth/login", proxyToIdentity);

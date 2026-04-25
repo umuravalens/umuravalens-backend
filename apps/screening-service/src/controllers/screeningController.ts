@@ -1,5 +1,7 @@
+import axios from "axios";
 import { NextFunction, Request, Response } from "express";
 import { AppError, ok } from "@umurava/shared-utils";
+import { env } from "../config/env";
 import { Screening } from "../models/Screening";
 import { screeningQueue } from "../services/queueService";
 
@@ -25,6 +27,17 @@ export const runScreening = async (req: Request, res: Response, next: NextFuncti
     const { jobId } = req.body;
     if (!jobId) {
       throw new AppError("jobId is required", 400);
+    }
+
+    // 1. Verify Job exists and has applicants
+    const jobRes = await axios.get(`${env.jobServiceUrl}/jobs/internal/${jobId}`).catch(() => null);
+    if (!jobRes || jobRes.status !== 200 || !jobRes.data?.data) {
+      throw new AppError("Job not found", 404);
+    }
+
+    const jobData = jobRes.data.data;
+    if (jobData.applicantCount === 0) {
+      throw new AppError("Cannot start screening: No applicants have applied for this job yet.", 400);
     }
 
     // Ensure only one active screening per job

@@ -183,5 +183,6 @@ const applicantSchema = new Schema<ApplicantDocument>(
   },
   { timestamps: true }
 );
+applicantSchema.index({ email: 1, jobId: 1 }, { unique: true });
 
 export const Applicant = model<ApplicantDocument>("Applicant", applicantSchema);

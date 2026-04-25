@@ -2,7 +2,6 @@ import { Router } from "express";
 import {
   addApplicant,
   applyApplicant,
-  verifyApplicant,
   deleteApplicant,
   getApplicantById,
   listApplicants,
@@ -17,15 +16,14 @@ import { upload } from "../utils/upload";
 
 const router = Router();
 
-router.post("/analyze", upload.single("resume"), extractInfo);
-router.post("/apply", upload.array("files", 10), applyApplicant);
-router.post("/verify/:applicantId", upload.array("files", 10), verifyApplicant);
+router.post("/analyze", upload.any(), extractInfo);
+router.post("/apply", upload.any(), applyApplicant);
 
 router.get("/applicants/internal/:jobId", listApplicantsByJobInternal);
 router.patch("/applicants/internal/:id/ai", updateApplicantAIInternal);
-router.post("/applicants", addApplicant);
-router.get("/applicants", listApplicants);
-router.get("/applicants/:jobId", listApplicantsByJob);
+router.post("/", addApplicant);
+router.get("/", listApplicants);
+router.get("/:jobId", listApplicantsByJob);
 router.get("/applicant-items/:id", getApplicantById);
 router.patch("/applicant-items/:id", updateApplicant);
 router.patch("/applicant-items/:id/documents/:storedFileName/verify", verifyDocument);
