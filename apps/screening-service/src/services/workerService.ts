@@ -27,7 +27,18 @@ export const startWorker = () => {
 
         // 2. Get Applicants for this job
         const applicantRes = await axios.get(`${env.applicantServiceUrl}/applicants/internal/${jobId}`);
-        const applicants = applicantRes.data.items || [];
+        const applicants = applicantRes.data.data?.items || [];
+
+        // Consistency check: Ensure the list matches the expected count
+        if (applicants.length !== jobData.applicantCount) {
+            logger.error({ 
+                message: "Applicant count mismatch during screening", 
+                jobId, 
+                expected: jobData.applicantCount, 
+                found: applicants.length 
+            });
+            throw new Error("error fetching applicants");
+        }
 
         screening.progress.total = applicants.length;
         screening.stats.totalApplicants = applicants.length;
@@ -86,7 +97,18 @@ export const startWorker = () => {
             }).catch(e => logger.warn({ message: "Failed to emit progress", error: e.message }));
 
           } catch (err: any) {
-            logger.error({ message: "Failed to screen applicant", applicantId: applicant._id, error: err.message });
+            let reason = err.message;
+            // Clean up the error message if it's the specific filesystem error
+            if (reason.startsWith("Critical document missing from filesystem:")) {
+                const docName = reason.split(":")[1]?.split("(")[0]?.trim() || "document";
+                reason = `${docName} missing`;
+            }
+
+            logger.error({ 
+                message: `Failed to screen ${applicant.name}: ${reason}`, 
+                applicantId: applicant._id, 
+                error: err.message 
+            });
           }
         }
 
@@ -96,7 +118,7 @@ export const startWorker = () => {
         await screening.save();
 
         // Notify Recruiter via Email if enabled
-        const userRes = await axios.get(`${env.identityServiceUrl}/auth/internal/users/${screening.recruiterId}`);
+        const userRes = await axios.get(`${env.identityServiceUrl}/internal/users/${screening.recruiterId}`);
         const user = userRes.data.data;
 
         const emailRequired = user?.notifications?.emailOnScreeningDone !== false;
@@ -116,6 +138,16 @@ export const startWorker = () => {
       } catch (error: any) {
         logger.error({ message: "Worker job failed", error: error.message, screeningId });
         await Screening.findByIdAndUpdate(screeningId, { status: "failed", error: error.message });
+
+        // Emit Failure via Notification Service
+        await axios.post(`${env.notificationServiceUrl}/notifications/emit`, {
+          event: "screening_failed",
+          data: {
+            screeningId,
+            jobId,
+            error: error.message
+          }
+        }).catch(e => logger.warn({ message: "Failed to emit failed event", error: e.message }));
       }
     },
     { connection, concurrency: 1 }

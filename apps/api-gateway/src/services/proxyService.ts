@@ -19,18 +19,21 @@ export const forwardRequest = async (baseUrl: string, req: Request, method: Meth
     // Append fields
     for (const key in req.body) {
       if (req.body[key] !== undefined) {
+        console.log(`[Proxy] Field: ${key}`);
         form.append(key, req.body[key]);
       }
     }
-    // Append single file
-    if (req.file) {
-      form.append("file", req.file.buffer, req.file.originalname);
-    }
-    // Append multiple files
-    if (req.files && Array.isArray(req.files)) {
+    // Append multiple files (prioritized)
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
       (req.files as Express.Multer.File[]).forEach((f) => {
-        form.append("files", f.buffer, f.originalname);
+        console.log(`[Proxy] File (req.files): ${f.fieldname}, ${f.originalname}`);
+        form.append(f.fieldname, f.buffer, f.originalname);
       });
+    } 
+    // Fallback to single file if files array is empty or not present
+    else if (req.file) {
+      console.log(`[Proxy] File (req.file): ${req.file.fieldname}, ${req.file.originalname}`);
+      form.append(req.file.fieldname, req.file.buffer, req.file.originalname);
     }
     data = form;
     headers = { ...headers, ...form.getHeaders() };

@@ -20,7 +20,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function fileToGenerativePart(filePath: string, mimeType: string) {
   // Assuming files are reachable at this path
-  const fullPath = path.resolve("apps/applicant-service/src/uploads", filePath);
+  // Files are stored in the applicant-service/src/uploads folder
+  const fullPath = path.resolve(__dirname, "../../../applicant-service/src/uploads", filePath);
   if (!fs.existsSync(fullPath)) return null;
 
   return {
