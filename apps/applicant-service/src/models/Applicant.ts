@@ -87,6 +87,7 @@ export interface ApplicantDocument {
     };
     rank: number;
   };
+  isShortlisted: boolean;
   createdAt?: Date;
 }
 
@@ -179,7 +180,8 @@ const applicantSchema = new Schema<ApplicantDocument>(
         comment: String
       },
       rank: Number
-    }
+    },
+    isShortlisted: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

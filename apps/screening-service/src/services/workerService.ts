@@ -117,6 +117,38 @@ export const startWorker = () => {
         screening.completedAt = new Date();
         await screening.save();
 
+        // 1. Rank all applicants and set isShortlisted
+        logger.info({ message: "Ranking applicants and updating final stats", jobId });
+        const allApplicantsRes = await axios.get(`${env.applicantServiceUrl}/applicants/internal/${jobId}`);
+        const allApplicants = allApplicantsRes.data.data?.items || [];
+        
+        // Sort by matchScore descending
+        allApplicants.sort((a: any, b: any) => (b.aiAnalysis?.matchScore || 0) - (a.aiAnalysis?.matchScore || 0));
+
+        let finalTopScore = 0;
+        let finalShortlistedCount = 0;
+        for (let i = 0; i < allApplicants.length; i++) {
+          const app = allApplicants[i];
+          const score = app.aiAnalysis?.matchScore || 0;
+          if (score > finalTopScore) finalTopScore = score;
+          
+          const isShortlisted = score >= (jobData.shortlist || 80);
+          if (isShortlisted) finalShortlistedCount++;
+          
+          await axios.patch(`${env.applicantServiceUrl}/applicants/internal/${app._id}/ai`, {
+            aiAnalysis: {
+              ...(app.aiAnalysis || {}),
+              rank: i + 1
+            },
+            isShortlisted
+          }).catch(e => logger.warn({ message: `Failed to update rank for ${app._id}`, error: e.message }));
+        }
+
+        // 2. Update Screening stats with final results
+        screening.stats.topScore = finalTopScore;
+        screening.stats.shortlistedCount = finalShortlistedCount;
+        await screening.save();
+
         // Notify Recruiter via Email if enabled
         const userRes = await axios.get(`${env.identityServiceUrl}/internal/users/${screening.recruiterId}`);
         const user = userRes.data.data;
