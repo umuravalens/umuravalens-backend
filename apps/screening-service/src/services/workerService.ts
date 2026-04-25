@@ -47,7 +47,8 @@ export const startWorker = () => {
         let topScore = 0;
         let shortlistedCount = 0;
 
-        for (let i = 0; i < applicants.length; i++) {
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < applicants.length; i += BATCH_SIZE) {
           // Re-fetch screening to check if it was stopped
           const currentScreening = await Screening.findById(screeningId);
           if (!currentScreening || currentScreening.status === "stopped") {
@@ -55,61 +56,71 @@ export const startWorker = () => {
             return;
           }
 
-          const applicant = applicants[i];
+          const batch = applicants.slice(i, i + BATCH_SIZE);
           
-          try {
-            // Stage: AI Analysis
-            const matchResult = await analyzeMatch(jobData, applicant);
-            
-            // Save to Applicant
-            await axios.patch(`${env.applicantServiceUrl}/applicants/internal/${applicant._id}/ai`, {
-              aiAnalysis: {
-                matchScore: matchResult.matchScore,
-                explanation: matchResult.explanation,
-                rank: 0
+          const batchResults = await Promise.all(batch.map(async (applicant: any) => {
+            try {
+              // Stage: AI Analysis
+              const matchResult = await analyzeMatch(jobData, applicant);
+              
+              // Save to Applicant
+              await axios.patch(`${env.applicantServiceUrl}/applicants/internal/${applicant._id}/ai`, {
+                aiAnalysis: {
+                  matchScore: matchResult.matchScore,
+                  explanation: matchResult.explanation,
+                  rank: 0
+                }
+              });
+
+              return { applicant, matchResult };
+            } catch (err: any) {
+              let reason = err.message;
+              // Clean up the error message if it's the specific filesystem error
+              if (reason.startsWith("Critical document missing from filesystem:")) {
+                  const docName = reason.split(":")[1]?.split("(")[0]?.trim() || "document";
+                  reason = `${docName} missing`;
               }
-            });
 
-            if (matchResult.matchScore >= (jobData.shortlist || 70)) {
-               shortlistedCount++;
+              logger.error({ 
+                  message: `Failed to screen ${applicant.name}: ${reason}`, 
+                  applicantId: applicant._id, 
+                  error: err.message 
+              });
+              return { applicant, error: reason };
             }
-            if (matchResult.matchScore > topScore) {
-                topScore = matchResult.matchScore;
-            }
+          }));
 
-            // Update Progress
-            currentScreening.progress.finished = i + 1;
-            currentScreening.stats.shortlistedCount = shortlistedCount;
-            currentScreening.stats.topScore = topScore;
-            await currentScreening.save();
-
-            // Emit Progress via Notification Service (WebSockets)
-            await axios.post(`${env.notificationServiceUrl}/notifications/emit`, {
-              event: "screening_progress",
-              data: {
-                screeningId,
-                jobId,
-                jobName: jobData.title,
-                finished: i + 1,
-                total: applicants.length,
-                percentage: Math.round(((i + 1) / applicants.length) * 100)
+          // Process batch results to update stats/progress
+          batchResults.forEach((res: any) => {
+            if ("matchResult" in res) {
+              const { matchResult } = res;
+              if (matchResult.matchScore >= (jobData.shortlist || 70)) {
+                 shortlistedCount++;
               }
-            }).catch(e => logger.warn({ message: "Failed to emit progress", error: e.message }));
-
-          } catch (err: any) {
-            let reason = err.message;
-            // Clean up the error message if it's the specific filesystem error
-            if (reason.startsWith("Critical document missing from filesystem:")) {
-                const docName = reason.split(":")[1]?.split("(")[0]?.trim() || "document";
-                reason = `${docName} missing`;
+              if (matchResult.matchScore > topScore) {
+                  topScore = matchResult.matchScore;
+              }
             }
+          });
 
-            logger.error({ 
-                message: `Failed to screen ${applicant.name}: ${reason}`, 
-                applicantId: applicant._id, 
-                error: err.message 
-            });
-          }
+          // Update Progress and Stats
+          currentScreening.progress.finished = Math.min(i + BATCH_SIZE, applicants.length);
+          currentScreening.stats.shortlistedCount = shortlistedCount;
+          currentScreening.stats.topScore = topScore;
+          await currentScreening.save();
+
+          // Emit Progress via Notification Service (WebSockets)
+          await axios.post(`${env.notificationServiceUrl}/notifications/emit`, {
+            event: "screening_progress",
+            data: {
+              screeningId,
+              jobId,
+              jobName: jobData.title,
+              finished: currentScreening.progress.finished,
+              total: applicants.length,
+              percentage: Math.round((currentScreening.progress.finished / applicants.length) * 100)
+            }
+          }).catch(e => logger.warn({ message: "Failed to emit progress", error: e.message }));
         }
 
         // Mark Completed

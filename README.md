@@ -14,7 +14,7 @@ UmuravaLens is a state-of-the-art recruitment platform backend built on a **micr
 - **AI Engine**: Google Gemini 2.5 Flash (Multimodal)
 - **Communication**: REST (HTTP/JSON), WebSockets (Socket.io)
 - **API Documentation**: OpenAPI (Swagger) & AsyncAPI (WebSockets)
-- **DevOps**: Docker, Docker Compose
+- **DevOps**: Docker, Docker Compose (Alpine-based with native build tools optimizations)
 
 ---
 
@@ -52,9 +52,9 @@ The pipeline aggregates a "360-degree" view of the candidate:
 - **Job Context**: The specific requirements and the recruiter-defined `shortlist` threshold.
 
 ### 2. Analysis Flow
-- **Worker Execution**: Background tasks are processed with a **5-attempt Exponential Backoff** retry policy to ensure 99.9% availability.
-- **multimodal Reasoning**: Gemini analyzes visual evidence (e.g., UI designs in a portfolio) alongside textual claims.
-- **Scoring**: A match score (0-100) is generated based on core tech stack alignment and experience depth.
+- **Worker Execution**: Background tasks are processed with a **5-attempt Exponential Backoff** retry policy. The pipeline operates with a **10-applicant parallel batching engine** for high-throughput screening.
+- **Multimodal Reasoning**: Gemini analyzes visual evidence (e.g., UI designs in a portfolio) alongside textual claims.
+- **Scoring & Ranking**: A match score (0-100) is generated. Applicants are then automatically **ranked** relative to the pool and assigned an `isShortlisted` status if they exceed the recruiter-defined threshold (default: 80).
 - **Commentary**: AI generates a strictly monitored **200-300 word professional analysis** justifying its decision.
 
 ### 3. Real-time Monitoring
@@ -85,7 +85,7 @@ Recruiters can watch the analysis happen live. The **Notification Service** emit
 
 #### 📄 Applicants
 - `POST /applicants/apply` | Primary endpoint for candidate applications + file uploads.
-- `GET /applicants?jobId=...` | List and filter applicants by job, source, or verification status.
+- `GET /applicants?jobId=...&orderBy=rank` | List and filter applicants by job, source, or verification status. Supports `orderBy` (rank, date create).
 - `POST /applicants/verify/:id` | Human-in-the-loop verification of candidate data.
 
 #### 📊 Screening
