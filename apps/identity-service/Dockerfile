@@ -9,6 +9,6 @@ FROM node:20-alpine
 WORKDIR /app
 COPY --from=builder /app /app
 ENV NODE_ENV=production
-WORKDIR /app/apps/auth-service
+WORKDIR /app/apps/identity-service
 EXPOSE 3000
 CMD ["npm", "run", "start"]
