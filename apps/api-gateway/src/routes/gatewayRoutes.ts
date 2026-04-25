@@ -38,7 +38,6 @@ router.use("/uploads", proxyApplicantUploads);
 router.get("/jobs/public/:publicId/:sourceCode?", getPublicJobDetails);
 router.post("/applicants/analyze", upload.any(), proxyToApplicants);
 router.post("/applicants/apply", upload.any(), proxyToApplicants);
-router.post("/applicants/verify/:applicantId", upload.any(), proxyToApplicants);
 
 router.post("/auth/register", proxyToIdentity);
 router.post("/auth/login", proxyToIdentity);
