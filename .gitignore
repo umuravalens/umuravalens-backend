@@ -2,8 +2,6 @@
 node_modules/
 
 # Environment variables
-.env
-.env.*
 !.env.example
 
 # Logs
@@ -36,7 +34,6 @@ coverage/
 .turbo/
 
 # IDE/editor files
-.vscode/
 .idea/
 *.suo
 *.ntvs*
@@ -47,3 +44,4 @@ coverage/
 # OS files
 .DS_Store
 Thumbs.db
+config.bat
