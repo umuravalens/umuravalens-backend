@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.fail = exports.ok = exports.AppError = exports.logger = void 0;
+exports.getUnderstandableMessage = exports.fail = exports.ok = exports.AppError = exports.logger = void 0;
 const winston_1 = require("winston");
 exports.logger = (0, winston_1.createLogger)({
     level: process.env.LOG_LEVEL || "info",
@@ -31,3 +31,19 @@ const fail = (error) => {
     };
 };
 exports.fail = fail;
+const getUnderstandableMessage = (err) => {
+    const msg = err?.message || String(err);
+    // Database connection issues
+    if (msg.includes("ECONNREFUSED") && (msg.includes("27017") || msg.includes("mongo"))) {
+        return "Unable to connect to mongo database";
+    }
+    // Microservice connection issues (Axios 1.x AggregateError or ECONNREFUSED)
+    if (msg === "AggregateError" ||
+        msg.includes("ECONNREFUSED") ||
+        msg.includes("ENOTFOUND") ||
+        msg.includes("ECONNRESET")) {
+        return "The requested service is currently unreachable. Please ensure all microservices are running.";
+    }
+    return msg;
+};
+exports.getUnderstandableMessage = getUnderstandableMessage;

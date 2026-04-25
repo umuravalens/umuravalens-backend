@@ -6,3 +6,4 @@ export declare class AppError extends Error {
 }
 export declare const ok: <T>(data: T) => ApiResponse<T>;
 export declare const fail: (error: string) => ApiResponse<null>;
+export declare const getUnderstandableMessage: (err: any) => string;
