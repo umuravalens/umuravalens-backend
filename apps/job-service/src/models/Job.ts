@@ -55,7 +55,7 @@ const jobSchema = new Schema<JobDocument>(
       enum: ["draft", "published", "closed", "archived"], 
       default: "draft" 
     },
-    shortlist: { type: Number, default: 0 },
+    shortlist: { type: Number, default: 80 },
     requiredDocuments: [
       {
         documentType: { type: String, required: true },

@@ -258,3 +258,16 @@ export const updateJobMetrics = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
+
+export const updateJobInternal = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const job = await Job.findByIdAndUpdate(id, req.body, { new: true });
+    if (!job) {
+      throw new AppError("Job not found", 404);
+    }
+    res.json(ok(job));
+  } catch (error) {
+    next(error);
+  }
+};

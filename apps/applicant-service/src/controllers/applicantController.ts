@@ -295,8 +295,15 @@ export const listApplicants = async (req: Request, res: Response, next: NextFunc
       query.documents = { $elemMatch: { isAdditional: true, isVerified: false } };
     }
 
+    const orderBy = String(req.query.orderBy || "").toLowerCase().replace(/\s/g, "");
+    const sort: any = {};
+    if (orderBy === "rank") {
+      sort["aiAnalysis.rank"] = 1;
+    }
+    sort["createdAt"] = -1;
+
     const [applicants, total] = await Promise.all([
-      Applicant.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Applicant.find(query).sort(sort).skip(skip).limit(limit),
       Applicant.countDocuments(query)
     ]);
     res.json(
@@ -320,8 +327,15 @@ export const listApplicantsByJob = async (req: Request, res: Response, next: Nex
     const recruiterId = getRecruiterId(req);
     const { page, limit, skip } = getPagination(req);
     const query = { jobId: req.params.jobId, createdBy: recruiterId };
+    const orderBy = String(req.query.orderBy || "").toLowerCase().replace(/\s/g, "");
+    const sort: any = {};
+    if (orderBy === "rank") {
+      sort["aiAnalysis.rank"] = 1;
+    }
+    sort["createdAt"] = -1;
+
     const [applicants, total] = await Promise.all([
-      Applicant.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Applicant.find(query).sort(sort).skip(skip).limit(limit),
       Applicant.countDocuments(query)
     ]);
     res.json(
@@ -400,11 +414,11 @@ export const updateApplicant = async (req: Request, res: Response, next: NextFun
 export const updateApplicantAIInternal = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { aiAnalysis } = req.body;
+    const { aiAnalysis, isShortlisted } = req.body;
 
     const applicant = await Applicant.findByIdAndUpdate(
       id,
-      { aiAnalysis },
+      { aiAnalysis, isShortlisted },
       { new: true }
     );
 

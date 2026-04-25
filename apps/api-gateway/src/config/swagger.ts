@@ -194,6 +194,7 @@ Public job and application routes (\`/public/jobs/...\`, applicant uploads under
                 }
               }
             },
+            isShortlisted: { type: "boolean", example: false },
             createdAt: { type: "string", format: "date-time" }
           }
         },
@@ -1354,7 +1355,8 @@ Public job and application routes (\`/public/jobs/...\`, applicant uploads under
             { in: "query", name: "source", schema: { type: "string" }, description: "Filter by application source code" },
             { in: "query", name: "needsVerification", schema: { type: "boolean" }, description: "Filter applicants with unverified additional documents" },
             { in: "query", name: "page", schema: { type: "integer", minimum: 1, default: 1 } },
-            { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
+            { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } },
+            { in: "query", name: "orderBy", schema: { type: "string", enum: ["rank", "date create"] }, description: "Sort order" }
           ],
           responses: {
             "200": {
@@ -1417,7 +1419,8 @@ Public job and application routes (\`/public/jobs/...\`, applicant uploads under
           parameters: [
             { in: "path", name: "jobId", required: true, schema: { type: "string" } },
             { in: "query", name: "page", schema: { type: "integer", minimum: 1, default: 1 } },
-            { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }
+            { in: "query", name: "limit", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } },
+            { in: "query", name: "orderBy", schema: { type: "string", enum: ["rank", "date create"] }, description: "Sort order" }
           ],
           responses: {
             "200": {
