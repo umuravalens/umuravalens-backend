@@ -2,8 +2,6 @@
 node_modules/
 
 # Environment variables
-.env
-.env.*
 !.env.example
 
 # Logs
@@ -47,3 +45,4 @@ coverage/
 # OS files
 .DS_Store
 Thumbs.db
+config.bat
