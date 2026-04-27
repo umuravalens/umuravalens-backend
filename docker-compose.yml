@@ -18,118 +18,45 @@ services:
     ports:
       - "${REDIS_PORT}:6379"
 
-  identity-service:
+  backend:
     build:
       context: .
-      dockerfile: apps/identity-service/Dockerfile
+      dockerfile: Dockerfile
     env_file: .env
     environment:
       IDENTITY_SERVICE_PORT: ${IDENTITY_SERVICE_PORT}
       AUTH_SERVICE_PORT: ${IDENTITY_SERVICE_PORT}
       IDENTITY_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/identitydb?authSource=admin
       AUTH_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/identitydb?authSource=admin
-      JWT_SECRET: ${JWT_SECRET}
-      DEFAULT_SOURCE_NAME: ${DEFAULT_SOURCE_NAME}
-      DEFAULT_SOURCE_CODE: ${DEFAULT_SOURCE_CODE}
-    depends_on:
-      - mongo
-
-  job-service:
-    build:
-      context: .
-      dockerfile: apps/job-service/Dockerfile
-    env_file: .env
-    environment:
       JOB_SERVICE_PORT: ${JOB_SERVICE_PORT}
       JOB_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/jobdb?authSource=admin
-      DEFAULT_SOURCE_NAME: ${DEFAULT_SOURCE_NAME}
-      DEFAULT_SOURCE_CODE: ${DEFAULT_SOURCE_CODE}
-    depends_on:
-      - mongo
-
-  applicant-service:
-    build:
-      context: .
-      dockerfile: apps/applicant-service/Dockerfile
-    env_file: .env
-    environment:
       APPLICANT_SERVICE_PORT: ${APPLICANT_SERVICE_PORT}
       APPLICANT_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/applicantdb?authSource=admin
       UPLOAD_DIR: /app/apps/applicant-service/src/uploads
-      JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL}
+      SCREENING_SERVICE_PORT: ${SCREENING_SERVICE_PORT}
+      SCREENING_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/screeningdb?authSource=admin
+      WORKER_SERVICE_PORT: ${WORKER_SERVICE_PORT}
+      NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT}
+      API_GATEWAY_PORT: ${API_GATEWAY_PORT}
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      DEFAULT_SOURCE_NAME: ${DEFAULT_SOURCE_NAME}
+      DEFAULT_SOURCE_CODE: ${DEFAULT_SOURCE_CODE}
+    ports:
+      - "${API_GATEWAY_PORT}:${API_GATEWAY_PORT}"
+      - "${IDENTITY_SERVICE_PORT}:${IDENTITY_SERVICE_PORT}"
+      - "${JOB_SERVICE_PORT}:${JOB_SERVICE_PORT}"
+      - "${APPLICANT_SERVICE_PORT}:${APPLICANT_SERVICE_PORT}"
+      - "${SCREENING_SERVICE_PORT}:${SCREENING_SERVICE_PORT}"
+      - "${NOTIFICATION_SERVICE_PORT}:${NOTIFICATION_SERVICE_PORT}"
+      - "${WORKER_SERVICE_PORT}:${WORKER_SERVICE_PORT}"
     volumes:
-      # Same files on your PC as inside the container (Windows: under your repo path)
       - ./apps/applicant-service/src/uploads:/app/apps/applicant-service/src/uploads
     depends_on:
       - mongo
-      - job-service
-
-  screening-service:
-    build:
-      context: .
-      dockerfile: apps/screening-service/Dockerfile
-    env_file: .env
-    environment:
-      SCREENING_SERVICE_PORT: ${SCREENING_SERVICE_PORT}
-      SCREENING_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/screeningdb?authSource=admin
-      REDIS_URL: redis://redis:6379
-    depends_on:
-      - mongo
       - redis
-
-  worker-service:
-    build:
-      context: .
-      dockerfile: apps/worker-service/Dockerfile
-    env_file: .env
-    environment:
-      WORKER_SERVICE_PORT: ${WORKER_SERVICE_PORT}
-      SCREENING_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/screeningdb?authSource=admin
-      REDIS_URL: redis://redis:6379
-      JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}
-      APPLICANT_SERVICE_URL: http://applicant-service:${APPLICANT_SERVICE_PORT}
-      NOTIFICATION_SERVICE_URL: http://notification-service:${NOTIFICATION_SERVICE_PORT}
-      DEFAULT_SOURCE_NAME: ${DEFAULT_SOURCE_NAME}
-      DEFAULT_SOURCE_CODE: ${DEFAULT_SOURCE_CODE}
-    depends_on:
-      - mongo
-      - redis
-      - job-service
-      - applicant-service
-      - notification-service
-
-  notification-service:
-    build:
-      context: .
-      dockerfile: apps/notification-service/Dockerfile
-    env_file: .env
-    environment:
-      NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT}
-    ports:
-      - "${NOTIFICATION_SERVICE_PORT}:${NOTIFICATION_SERVICE_PORT}"
-
-  api-gateway:
-    build:
-      context: .
-      dockerfile: apps/api-gateway/Dockerfile
-    env_file: .env
-    environment:
-      API_GATEWAY_PORT: ${API_GATEWAY_PORT}
-      JWT_SECRET: ${JWT_SECRET}
-      IDENTITY_SERVICE_URL: http://identity-service:${IDENTITY_SERVICE_PORT}
-      JOB_SERVICE_URL: http://job-service:${JOB_SERVICE_PORT}
-      APPLICANT_SERVICE_URL: http://applicant-service:${APPLICANT_SERVICE_PORT}
-      SCREENING_SERVICE_URL: http://screening-service:${SCREENING_SERVICE_PORT}
-    ports:
-      - "${API_GATEWAY_PORT}:${API_GATEWAY_PORT}"
-    depends_on:
-      - identity-service
-      - job-service
-      - applicant-service
-      - screening-service
 
 volumes:
   mongo_data:

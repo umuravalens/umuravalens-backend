@@ -1,4 +1,4 @@
-import { ApiResponse } from "@umurava/shared-types";
+import { ApiResponse } from "../../shared-types/src/index";
 import { createLogger, format, transports } from "winston";
 
 export const logger = createLogger({
