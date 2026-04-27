@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present -s",
+    "start": "concurrently -n gateway,identity,job,applicant,worker,screening,notify -c \"bgBlue.bold,bgGreen.bold,bgMagenta.bold,bgCyan.bold,bgWhite.bold,bgRed.bold,bgYellow.bold\" \"npm run start -w @umurava/api-gateway\" \"npm run start -w @umurava/identity-service\" \"npm run start -w @umurava/job-service\" \"npm run start -w @umurava/applicant-service\" \"npm run start -w @umurava/worker-service\" \"npm run start -w @umurava/screening-service\" \"npm run start -w @umurava/notification-service\"",
     "dev": "concurrently -n gateway,identity,job,applicant,worker,screening,notify -c \"bgBlue.bold,bgGreen.bold,bgMagenta.bold,bgCyan.bold,bgWhite.bold,bgRed.bold,bgYellow.bold\" \"tsx watch --env-file .env apps/api-gateway/src/index.ts\" \"tsx watch --env-file .env apps/identity-service/src/index.ts\" \"tsx watch --env-file .env apps/job-service/src/index.ts\" \"tsx watch --env-file .env apps/applicant-service/src/index.ts\" \"tsx watch --env-file .env apps/worker-service/src/index.ts\" \"tsx watch --env-file .env apps/screening-service/src/index.ts\" \"tsx watch --env-file .env apps/notification-service/src/index.ts\""
   },
   "devDependencies": {
