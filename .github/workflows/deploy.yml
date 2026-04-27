@@ -18,6 +18,7 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
+          port: 10039
           script: |
             cd /umuravalens-backend
             git pull origin main
@@ -27,10 +28,6 @@ jobs:
             
             # Build and restart containers
             docker compose up --build -d
-            
-            # Optional: If this is a Django/Node backend, run migrations
-            # Replace 'backend-container-name' with your actual container name
-            # docker compose exec -T backend-container-name python manage.py migrate
             
             # Cleanup old images to prevent Ubuntu 24.04 disk from filling up
             docker image prune -f
