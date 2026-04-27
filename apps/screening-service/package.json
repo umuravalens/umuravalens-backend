@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
+<<<<<<< HEAD
     "start": "node dist/apps/screening-service/src/index.js"
+=======
+    "start": "node dist/index.js"
+>>>>>>> 13a2fd59e4498a89864e0b9aeafab82269b43c71
   },
   "dependencies": {
     "bullmq": "^5.41.2",

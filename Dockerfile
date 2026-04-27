@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Builder stage
 FROM node:20-alpine AS builder
 WORKDIR /app
@@ -50,3 +51,17 @@ EXPOSE 8090 8091 8092 8093 8094 8095 8096
 
 # Start all services concurrently (uses the root package.json script)
 CMD ["npm", "run", "start"]
+=======
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY . .
+RUN apk add --no-cache python3 make g++
+RUN npm ci
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app /app
+ENV NODE_ENV=production
+# All workspace dist/ folders are compiled and available under /app
+>>>>>>> 13a2fd59e4498a89864e0b9aeafab82269b43c71
