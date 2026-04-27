@@ -5,11 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-<<<<<<< HEAD
     "start": "node dist/apps/notification-service/src/index.js"
-=======
-    "start": "node dist/index.js"
->>>>>>> 13a2fd59e4498a89864e0b9aeafab82269b43c71
   },
   "dependencies": {
     "cors": "^2.8.5",

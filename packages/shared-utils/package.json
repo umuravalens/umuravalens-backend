@@ -1,13 +1,8 @@
 {
   "name": "@umurava/shared-utils",
   "version": "1.0.0",
-<<<<<<< HEAD
-  "main": "src/index.js",
-  "types": "src/index.d.ts",
-=======
   "main": "src/index.ts",
   "types": "src/index.ts",
->>>>>>> 13a2fd59e4498a89864e0b9aeafab82269b43c71
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
