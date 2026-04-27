@@ -1,0 +1,1 @@
+import { Queue } from "bullmq";import IORedis from "ioredis";import { env } from "../config/env";const connection=new IORedis(env.redisUrl,{maxRetriesPerRequest:null});export const screeningQueue=new Queue("screening-queue",{connection,defaultJobOptions:{attempts:3,removeOnComplete:true,removeOnFail:false}});

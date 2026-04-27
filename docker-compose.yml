@@ -1,0 +1,62 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: umurava-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    ports:
+      - "${MONGO_PORT}:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: umurava-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT}:6379"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      IDENTITY_SERVICE_PORT: ${IDENTITY_SERVICE_PORT}
+      AUTH_SERVICE_PORT: ${IDENTITY_SERVICE_PORT}
+      IDENTITY_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/identitydb?authSource=admin
+      AUTH_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/identitydb?authSource=admin
+      JOB_SERVICE_PORT: ${JOB_SERVICE_PORT}
+      JOB_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/jobdb?authSource=admin
+      APPLICANT_SERVICE_PORT: ${APPLICANT_SERVICE_PORT}
+      APPLICANT_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/applicantdb?authSource=admin
+      UPLOAD_DIR: /app/apps/applicant-service/src/uploads
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      SCREENING_SERVICE_PORT: ${SCREENING_SERVICE_PORT}
+      SCREENING_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/screeningdb?authSource=admin
+      WORKER_SERVICE_PORT: ${WORKER_SERVICE_PORT}
+      NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT}
+      API_GATEWAY_PORT: ${API_GATEWAY_PORT}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      DEFAULT_SOURCE_NAME: ${DEFAULT_SOURCE_NAME}
+      DEFAULT_SOURCE_CODE: ${DEFAULT_SOURCE_CODE}
+    ports:
+      - "${API_GATEWAY_PORT}:${API_GATEWAY_PORT}"
+      - "${IDENTITY_SERVICE_PORT}:${IDENTITY_SERVICE_PORT}"
+      - "${JOB_SERVICE_PORT}:${JOB_SERVICE_PORT}"
+      - "${APPLICANT_SERVICE_PORT}:${APPLICANT_SERVICE_PORT}"
+      - "${SCREENING_SERVICE_PORT}:${SCREENING_SERVICE_PORT}"
+      - "${NOTIFICATION_SERVICE_PORT}:${NOTIFICATION_SERVICE_PORT}"
+      - "${WORKER_SERVICE_PORT}:${WORKER_SERVICE_PORT}"
+    volumes:
+      - ./apps/applicant-service/src/uploads:/app/apps/applicant-service/src/uploads
+    depends_on:
+      - mongo
+      - redis
+
+volumes:
+  mongo_data:

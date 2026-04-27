@@ -1,0 +1,206 @@
+import axios from "axios";
+import { Worker } from "bullmq";
+import IORedis from "ioredis";
+import { env } from "../config/env";
+import { Screening } from "../models/Screening";
+import { analyzeMatch } from "./aiService";
+import { logger } from "@umurava/shared-utils";
+
+const connection = new IORedis(env.redisUrl, { maxRetriesPerRequest: null });
+
+export const startWorker = () => {
+  const worker = new Worker(
+    "screening-queue",
+    async (job) => {
+      const { screeningId, jobId } = job.data;
+      
+      try {
+        const screening = await Screening.findById(screeningId);
+        if (!screening) return;
+
+        screening.status = "processing";
+        await screening.save();
+
+        // 1. Get Job details
+        const jobRes = await axios.get(`${env.jobServiceUrl}/jobs/internal/${jobId}`);
+        const jobData = jobRes.data.data;
+
+        // 2. Get Applicants for this job
+        const applicantRes = await axios.get(`${env.applicantServiceUrl}/applicants/internal/${jobId}`);
+        const applicants = applicantRes.data.data?.items || [];
+
+        // Consistency check: Ensure the list matches the expected count
+        if (applicants.length !== jobData.applicantCount) {
+            logger.error({ 
+                message: "Applicant count mismatch during screening", 
+                jobId, 
+                expected: jobData.applicantCount, 
+                found: applicants.length 
+            });
+            throw new Error("error fetching applicants");
+        }
+
+        screening.progress.total = applicants.length;
+        screening.stats.totalApplicants = applicants.length;
+        await screening.save();
+
+        let topScore = 0;
+        let shortlistedCount = 0;
+
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < applicants.length; i += BATCH_SIZE) {
+          // Re-fetch screening to check if it was stopped
+          const currentScreening = await Screening.findById(screeningId);
+          if (!currentScreening || currentScreening.status === "stopped") {
+            logger.info({ message: "Screening stopped by user", screeningId });
+            return;
+          }
+
+          const batch = applicants.slice(i, i + BATCH_SIZE);
+          
+          const batchResults = await Promise.all(batch.map(async (applicant: any) => {
+            try {
+              // Stage: AI Analysis
+              const matchResult = await analyzeMatch(jobData, applicant);
+              
+              // Save to Applicant
+              await axios.patch(`${env.applicantServiceUrl}/applicants/internal/${applicant._id}/ai`, {
+                aiAnalysis: {
+                  matchScore: matchResult.matchScore,
+                  explanation: matchResult.explanation,
+                  rank: 0
+                }
+              });
+
+              return { applicant, matchResult };
+            } catch (err: any) {
+              let reason = err.message;
+              // Clean up the error message if it's the specific filesystem error
+              if (reason.startsWith("Critical document missing from filesystem:")) {
+                  const docName = reason.split(":")[1]?.split("(")[0]?.trim() || "document";
+                  reason = `${docName} missing`;
+              }
+
+              logger.error({ 
+                  message: `Failed to screen ${applicant.name}: ${reason}`, 
+                  applicantId: applicant._id, 
+                  error: err.message 
+              });
+              return { applicant, error: reason };
+            }
+          }));
+
+          // Process batch results to update stats/progress
+          batchResults.forEach((res: any) => {
+            if ("matchResult" in res) {
+              const { matchResult } = res;
+              if (matchResult.matchScore >= (jobData.shortlist || 70)) {
+                 shortlistedCount++;
+              }
+              if (matchResult.matchScore > topScore) {
+                  topScore = matchResult.matchScore;
+              }
+            }
+          });
+
+          // Update Progress and Stats
+          currentScreening.progress.finished = Math.min(i + BATCH_SIZE, applicants.length);
+          currentScreening.stats.shortlistedCount = shortlistedCount;
+          currentScreening.stats.topScore = topScore;
+          await currentScreening.save();
+
+          // Emit Progress via Notification Service (WebSockets)
+          await axios.post(`${env.notificationServiceUrl}/notifications/emit`, {
+            event: "screening_progress",
+            data: {
+              screeningId,
+              jobId,
+              jobName: jobData.title,
+              finished: currentScreening.progress.finished,
+              total: applicants.length,
+              percentage: Math.round((currentScreening.progress.finished / applicants.length) * 100)
+            }
+          }).catch(e => logger.warn({ message: "Failed to emit progress", error: e.message }));
+        }
+
+        // Mark Completed
+        screening.status = "completed";
+        screening.completedAt = new Date();
+        await screening.save();
+
+        // 1. Rank all applicants and set isShortlisted
+        logger.info({ message: "Ranking applicants and updating final stats", jobId });
+        const allApplicantsRes = await axios.get(`${env.applicantServiceUrl}/applicants/internal/${jobId}`);
+        const allApplicants = allApplicantsRes.data.data?.items || [];
+        
+        // Sort by matchScore descending
+        allApplicants.sort((a: any, b: any) => (b.aiAnalysis?.matchScore || 0) - (a.aiAnalysis?.matchScore || 0));
+
+        let finalTopScore = 0;
+        let finalShortlistedCount = 0;
+        for (let i = 0; i < allApplicants.length; i++) {
+          const app = allApplicants[i];
+          const score = app.aiAnalysis?.matchScore || 0;
+          if (score > finalTopScore) finalTopScore = score;
+          
+          const isShortlisted = score >= (jobData.shortlist || 80);
+          if (isShortlisted) finalShortlistedCount++;
+          
+          await axios.patch(`${env.applicantServiceUrl}/applicants/internal/${app._id}/ai`, {
+            aiAnalysis: {
+              ...(app.aiAnalysis || {}),
+              rank: i + 1
+            },
+            isShortlisted
+          }).catch(e => logger.warn({ message: `Failed to update rank for ${app._id}`, error: e.message }));
+        }
+
+        // 2. Update Screening stats with final results
+        screening.stats.topScore = finalTopScore;
+        screening.stats.shortlistedCount = finalShortlistedCount;
+        await screening.save();
+
+        // Notify Recruiter via Email if enabled
+        const userRes = await axios.get(`${env.identityServiceUrl}/internal/users/${screening.recruiterId}`);
+        const user = userRes.data.data;
+
+        const emailRequired = user?.notifications?.emailOnScreeningDone !== false;
+
+        await axios.post(`${env.notificationServiceUrl}/notifications/emit`, {
+          event: "screening_finished",
+          data: {
+            screeningId,
+            jobId,
+            jobName: jobData.title,
+            recruiterEmail: user.email,
+            sendEmail: emailRequired,
+            stats: screening.stats
+          }
+        }).catch(e => logger.warn({ message: "Failed to emit finished event", error: e.message }));
+
+      } catch (error: any) {
+        logger.error({ message: "Worker job failed", error: error.message, screeningId });
+        await Screening.findByIdAndUpdate(screeningId, { status: "failed", error: error.message });
+
+        // Emit Failure via Notification Service
+        await axios.post(`${env.notificationServiceUrl}/notifications/emit`, {
+          event: "screening_failed",
+          data: {
+            screeningId,
+            jobId,
+            error: error.message
+          }
+        }).catch(e => logger.warn({ message: "Failed to emit failed event", error: e.message }));
+      }
+    },
+    { connection, concurrency: 1 }
+  );
+
+  worker.on("completed", (job) => {
+    logger.info({ message: "Screening job completed", jobId: job.id });
+  });
+
+  worker.on("failed", (job, err) => {
+    logger.error({ message: "Screening job failed", jobId: job?.id, error: err.message });
+  });
+};
