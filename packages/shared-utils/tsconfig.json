@@ -1,9 +1,13 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "declaration": true
+    "declaration": true,
+    "baseUrl": ".",
+    "paths": {
+      "@umurava/shared-types": ["../shared-types/src/index"]
+    }
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*"
   ]
 }
