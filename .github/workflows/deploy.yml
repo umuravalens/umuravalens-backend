@@ -20,7 +20,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 10039
           script: |
-            cd /umuravalens-backend
+            cd /home/administrator/umuravalens-backend
             git pull origin main
             
             # Use GitHub Secrets to build the .env file
