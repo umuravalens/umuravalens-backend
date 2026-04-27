@@ -1,0 +1,36 @@
+name: Deploy Umurava Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /umuravalens-backend
+            git pull origin main
+            
+            # Use GitHub Secrets to build the .env file
+            echo "${{ secrets.ENV_FILE }}" > .env
+            
+            # Build and restart containers
+            docker compose up --build -d
+            
+            # Optional: If this is a Django/Node backend, run migrations
+            # Replace 'backend-container-name' with your actual container name
+            # docker compose exec -T backend-container-name python manage.py migrate
+            
+            # Cleanup old images to prevent Ubuntu 24.04 disk from filling up
+            docker image prune -f
