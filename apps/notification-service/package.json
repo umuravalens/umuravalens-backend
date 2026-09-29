@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/apps/notification-service/src/index.js"
+    "dev": "node init && tsx watch src/index.ts",
+    "build": "node init && tsc -p tsconfig.json",
+    "start": "node init && node dist/apps/notification-service/src/index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
