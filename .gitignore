@@ -45,3 +45,4 @@ coverage/
 .DS_Store
 Thumbs.db
 config.bat
+.vscode/tasks.json
